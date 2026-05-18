@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -18,6 +19,28 @@ import gradio as gr
 
 from orchestrator.scoring import evaluate_submission
 from orchestrator.hint_graph import get_hint
+
+
+# ── API Key Validation ────────────────────────────────────────────────────────
+
+def validate_openai_key(api_key: str) -> tuple[bool, str]:
+    """Validate OpenAI API key by making a test call."""
+    if not api_key or not api_key.startswith("sk-"):
+        return False, "❌ Invalid API key format. Must start with 'sk-'"
+    
+    try:
+        os.environ["OPENAI_API_KEY"] = api_key
+        from langchain_openai import ChatOpenAI
+        llm = ChatOpenAI(model="gpt-4o", temperature=0, request_timeout=10, max_tokens=5)
+        llm.invoke("test")
+        return True, "✅ API key validated!"
+    except Exception as e:
+        error = str(e)
+        if "401" in error or "Incorrect API key" in error:
+            return False, "❌ Invalid API key"
+        elif "quota" in error.lower():
+            return False, "⚠️ API key valid but no quota remaining"
+        return True, "✅ Key accepted (couldn't fully verify)"
 
 
 # ── Challenge state loader ────────────────────────────────────────────────────
@@ -1025,11 +1048,15 @@ def _score_summary_html(result: dict) -> str:
 
 def create_full_interface() -> gr.Blocks:
     """
-    Returns a Gradio app with three logical pages:
+    Returns a Gradio app with login page (if needed) + challenge interface:
+      Page 0: Login (visible only if OPENAI_API_KEY not in .env)
       Page 1: Setup form (name / URL / level / bugs)
       Page 2: Challenge interface (shown after pipeline finishes)
       Page 3: Results (shown after Submit)
     """
+    
+    # Auto-detect: is there an API key in .env?
+    has_env_key = bool(os.getenv("OPENAI_API_KEY"))
 
     css = """
     #code-editor {
@@ -1044,22 +1071,70 @@ def create_full_interface() -> gr.Blocks:
     #code-editor .cm-editor {
         background-color: #1e1e1e !important;
     }
+    
+    /* Logout button styling */
+    #logout-btn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+    }
+    .setup-card {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 30px;
+    }
     """
 
     with gr.Blocks(title="Legacy Code Challenge", css=css) as demo:
 
         # Shared state
+        user_api_key_state        = gr.State("")
+        user_name_state           = gr.State("")
         workspace_state           = gr.State("")
         hints_used_state          = gr.State(0)
         submission_count_state    = gr.State(0)
         hint_log_state            = gr.State([])
         confirmation_pending_state = gr.State(False)
         timer_trigger             = gr.Number(value=0, visible=False)
+        
+        # Logout button (hidden until logged in)
+        with gr.Row():
+            gr.HTML("")  # spacer
+            logout_btn = gr.Button("🔓 Logout", visible=False, elem_id="logout-btn", size="sm")
+        
+        # ════════════════════════════════════════════════════════════════════
+        # PAGE 0 — Login (visible only if no .env key)
+        # ════════════════════════════════════════════════════════════════════
+        with gr.Column(visible=not has_env_key, elem_classes=["setup-card"]) as login_page:
+            gr.Markdown(
+                "# 🔐 Welcome to Legacy Code Challenge\n"
+                "### Please enter your details to continue"
+            )
+            
+            login_name = gr.Textbox(
+                label="Your Name",
+                placeholder="e.g. Alice Smith",
+            )
+            
+            login_api_key = gr.Textbox(
+                label="OpenAI API Key",
+                placeholder="sk-proj-...",
+                type="password",
+                info="Get one at platform.openai.com/api-keys",
+            )
+            
+            gr.Markdown(
+                "⚠️ **Note:** Your API key is only used for this session and consumes credits from your OpenAI account."
+            )
+            
+            login_btn = gr.Button("🚀 Continue", variant="primary", size="lg")
+            login_status = gr.Markdown("")
 
         # ════════════════════════════════════════════════════════════════════
-        # PAGE 1 — Setup
+        # PAGE 1 — Setup (visible if .env exists, else hidden)
         # ════════════════════════════════════════════════════════════════════
-        with gr.Column(visible=True, elem_classes=["setup-card"]) as setup_page:
+        with gr.Column(visible=has_env_key, elem_classes=["setup-card"]) as setup_page:
             gr.Markdown(
                 "# 🐛 Legacy Code Challenge\n"
                 "Fill in the details below, then click **Start Challenge**."
@@ -1193,10 +1268,60 @@ def create_full_interface() -> gr.Blocks:
                 with gr.Tab("💡 Hints Used"):
                     results_hints_html = gr.HTML("")
 
+        # ── Login callback ────────────────────────────────────────────────
+        
+        def on_login(name, api_key):
+            if not name.strip():
+                return (
+                    gr.update(),  # login page stays
+                    gr.update(),  # setup page hidden
+                    gr.update(),  # logout hidden
+                    "❌ Please enter your name",
+                    "", ""  # states empty
+                )
+            
+            valid, msg = validate_openai_key(api_key)
+            if not valid:
+                return (
+                    gr.update(),
+                    gr.update(),
+                    gr.update(),
+                    msg,
+                    "", ""
+                )
+            
+            # Success!
+            os.environ["OPENAI_API_KEY"] = api_key
+            return (
+                gr.update(visible=False),  # hide login
+                gr.update(visible=True),   # show setup
+                gr.update(visible=True),   # show logout
+                "✅ Logged in!",
+                api_key,
+                name.strip()
+            )
+        
+        def on_logout():
+            """Clear API key and return to login page."""
+            if "OPENAI_API_KEY" in os.environ:
+                del os.environ["OPENAI_API_KEY"]
+            return (
+                gr.update(visible=True),   # show login
+                gr.update(visible=False),  # hide setup
+                gr.update(visible=False),  # hide challenge
+                gr.update(visible=False),  # hide results
+                gr.update(visible=False),  # hide logout
+                "", "", "", "",  # clear textboxes
+                "", ""  # clear states
+            )
+
         # ── Setup callback ─────────────────────────────────────────────────
 
-        def on_start(name, url, nesting_lvl, num_bugs, refactoring, debug, timer_mins):
+        def on_start(name, url, nesting_lvl, num_bugs, refactoring, debug, timer_mins, user_name_from_login):
             nesting = int(nesting_lvl)
+            
+            # Use login name if available, otherwise name from setup form
+            name_str = user_name_from_login.strip() if user_name_from_login else name.strip()
 
             yield (
                 gr.update(visible=True,
@@ -1212,7 +1337,6 @@ def create_full_interface() -> gr.Blocks:
                 cs       = ChallengeState(workspace_path)
                 py_files = cs.list_py_files()
                 default  = cs.target_file if cs.target_file in py_files else (py_files[0] if py_files else "")
-                name_str = name.strip()
                 suffix   = f" &nbsp;|&nbsp; {name_str}" if name_str else ""
 
                 yield (
@@ -1236,9 +1360,30 @@ def create_full_interface() -> gr.Blocks:
                     "", 0,
                 )
 
+        # ── Wiring for login ──────────────────────────────────────────────
+        
+        login_btn.click(
+            on_login,
+            inputs=[login_name, login_api_key],
+            outputs=[
+                login_page, setup_page, logout_btn,
+                login_status,
+                user_api_key_state, user_name_state
+            ]
+        )
+        
+        logout_btn.click(
+            on_logout,
+            outputs=[
+                login_page, setup_page, challenge_page, results_page, logout_btn,
+                login_name, login_api_key, name_box, url_box,
+                user_api_key_state, user_name_state
+            ]
+        )
+        
         start_btn.click(
             on_start,
-            inputs=[name_box, url_box, nesting_slider, bugs_slider, refactoring_check, debug_check, timer_slider],
+            inputs=[name_box, url_box, nesting_slider, bugs_slider, refactoring_check, debug_check, timer_slider, user_name_state],
             outputs=[
                 status_box, start_btn,
                 setup_page, challenge_page,

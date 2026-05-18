@@ -38,9 +38,8 @@ if os.getenv("https_proxy"):
 if os.getenv("no_proxy"):
     os.environ["no_proxy"] = os.getenv("no_proxy")
 
-if not os.getenv("OPENAI_API_KEY"):
-    print("ERROR: OPENAI_API_KEY not set. Add it to .env or export it.")
-    sys.exit(1)
+# Note: API key is optional in hosted mode (users provide their own via login page)
+# Only enforce it when github_url is provided (CLI mode requires API key to run pipeline)
 
 import gradio as gr                    # noqa: E402
 import student_interface               # noqa: E402
@@ -100,6 +99,12 @@ def main() -> None:
 
     if args.github_url:
         # ── Fast path: CLI args supplied → skip setup page ──────────────
+        # CLI mode requires API key to run the pipeline
+        if not os.getenv("OPENAI_API_KEY"):
+            print("ERROR: OPENAI_API_KEY not set. Add it to .env or export it.")
+            print("(CLI mode requires API key to generate challenges)")
+            sys.exit(1)
+        
         if not args.name:
             parser.error("--name is required when providing a GitHub URL (e.g. --name 'Alice Smith')")
         print(
