@@ -24,23 +24,29 @@ if os.getenv("no_proxy"):
 
 import gradio as gr
 import student_interface
+import threading
+
+
+# Create the Gradio interface globally
+port = int(os.getenv("PORT", "7860"))
+has_key = bool(os.getenv("OPENAI_API_KEY"))
+
+print(f"\n🚀 Starting Legacy Code Challenge on port {port}...")
+print(f"📍 Server will listen on 0.0.0.0:{port}")
+
+if has_key:
+    print("✅ API key detected in environment — skipping login page")
+else:
+    print("🔐 No API key found — login page will be shown")
+
+demo = student_interface.create_full_interface()
+
+# Make `app` available for gunicorn (even though it won't work with WebSockets)
+app = demo.app  # This is the FastAPI/Starlette app inside Gradio
 
 
 def main() -> None:
     """Launch the full interface with auto-detected login page."""
-    
-    port = int(os.getenv("PORT", "7860"))  # Render provides PORT env var
-    
-    print(f"\n🚀 Starting Legacy Code Challenge on port {port}...")
-    print(f"📍 Server will listen on 0.0.0.0:{port}")
-    
-    has_key = bool(os.getenv("OPENAI_API_KEY"))
-    if has_key:
-        print("✅ API key detected in environment — skipping login page")
-    else:
-        print("🔐 No API key found — login page will be shown")
-    
-    demo = student_interface.create_full_interface()
     
     print(f"🌐 Launching Gradio on 0.0.0.0:{port}...")
     
