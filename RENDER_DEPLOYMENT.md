@@ -33,9 +33,15 @@
 ## Files for Render
 
 - `app.py` - Main entry point for hosted environment
-- `render.yaml` - Render configuration
+- `render.yaml` - Render configuration (includes git installation)
+- `Aptfile` - System packages (git required for cloning repos)
 - `requirements.txt` - Python dependencies
 - `start.sh` - Alternative startup script
+
+## Important: Git Requirement
+
+This project clones GitHub repositories dynamically at runtime using GitPython. 
+The `Aptfile` ensures git is installed in the Render container.
 
 ## Environment Variables
 
@@ -68,6 +74,12 @@ mv .env.backup .env
 **"API key valid but no quota"?**
 - User needs to add credits to their OpenAI account at platform.openai.com/billing
 
+**"git: command not found" or clone errors?**
+- Ensure `Aptfile` is committed to your repo
+- Render should automatically install git from Aptfile
+- Check build logs to verify git installation
+
 **Timeout errors?**
-- Render free tier may timeout on long operations
+- Render free tier may timeout on long operations (cloning + bug injection can take 1-2 min)
 - Consider upgrading to paid plan for production use
+- Free tier has 15-minute request timeout
