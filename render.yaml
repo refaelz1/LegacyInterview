@@ -7,6 +7,7 @@ services:
       apt-get update && apt-get install -y git
       pip install -r requirements.txt
     startCommand: python app.py
+    healthCheckPath: /
     envVars:
       - key: OPENAI_API_KEY
         sync: false
@@ -14,4 +15,6 @@ services:
         value: 3.11.0
       - key: PORT
         value: 10000
+      - key: GRADIO_SERVER_NAME
+        value: "0.0.0.0"
     autoDeploy: true

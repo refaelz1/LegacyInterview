@@ -29,6 +29,7 @@ def main() -> None:
     port = int(os.getenv("PORT", "7860"))  # Render provides PORT env var
     
     print(f"\n🚀 Starting Legacy Code Challenge on port {port}...")
+    print(f"📍 Server will listen on 0.0.0.0:{port}")
     
     has_key = bool(os.getenv("OPENAI_API_KEY"))
     if has_key:
@@ -38,6 +39,8 @@ def main() -> None:
     
     demo = student_interface.create_full_interface()
     
+    print(f"🌐 Launching Gradio on 0.0.0.0:{port}...")
+    
     demo.launch(
         server_name="0.0.0.0",  # Listen on all interfaces for hosting
         server_port=port,
@@ -46,7 +49,10 @@ def main() -> None:
         theme=gr.themes.Base(),
         css=student_interface._CSS,
         js=student_interface._JS,
+        show_error=True,  # Show detailed errors in Render logs
     )
+    
+    print("✅ Gradio server started successfully!")
 
 
 if __name__ == "__main__":

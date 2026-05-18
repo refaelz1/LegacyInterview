@@ -5,4 +5,3 @@ gitpython
 python-dotenv
 gradio
 pywebview
-gunicorn
