@@ -3,6 +3,9 @@ app.py — Simplified entry point for hosting platforms (Render, Hugging Face, e
 
 This file launches the full interface with login page support.
 No API key required — users provide their own via the login page.
+
+IMPORTANT: This is a Gradio application, NOT a WSGI app.
+Do not use gunicorn! Run directly with: python app.py
 """
 
 import os
