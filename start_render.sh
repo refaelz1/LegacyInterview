@@ -1,4 +1,4 @@
 #!/bin/bash
-# Render startup script - use uvicorn for ASGI support
-echo "🚀 Starting with uvicorn (ASGI server for Gradio/FastAPI)..."
-exec uvicorn app:app --host 0.0.0.0 --port ${PORT:-10000}
+# Render startup script - run Gradio directly
+echo "🚀 Starting Gradio application..."
+exec python app.py
