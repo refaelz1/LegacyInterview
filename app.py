@@ -24,10 +24,9 @@ if os.getenv("no_proxy"):
 
 import gradio as gr
 import student_interface
-import threading
 
 
-# Create the Gradio interface globally
+# Create the Gradio interface globally for uvicorn
 port = int(os.getenv("PORT", "7860"))
 has_key = bool(os.getenv("OPENAI_API_KEY"))
 
@@ -41,10 +40,11 @@ else:
 
 demo = student_interface.create_full_interface()
 
-# Make `app` available for gunicorn (even though it won't work with WebSockets)
-app = demo.app  # This is the FastAPI/Starlette app inside Gradio
+# Expose the FastAPI/ASGI app for uvicorn
+app = demo.app
 
 
+# For direct Python execution (development)
 def main() -> None:
     """Launch the full interface with auto-detected login page."""
     
