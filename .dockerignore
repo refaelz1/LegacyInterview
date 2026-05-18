@@ -1,0 +1,21 @@
+# Files not to include in Docker image
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.env
+.env.backup
+.git/
+.gitignore
+*.md
+!README.md
+workspaces/
+*.log
+.vscode/
+.idea/
