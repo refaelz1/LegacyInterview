@@ -99,7 +99,11 @@ def upload_submission_to_drive(
         if use_shared_drive:
             folder_metadata['parents'] = [folder_id]
         
-        folder = service.files().create(body=folder_metadata, fields='id').execute()
+        folder = service.files().create(
+            body=folder_metadata,
+            fields='id',
+            supportsAllDrives=True  # Support Shared Drives
+        ).execute()
         submission_folder_id = folder.get('id')
         print(f"✅ Folder created: {submission_folder_id}")
         
@@ -117,7 +121,8 @@ def upload_submission_to_drive(
                     service.permissions().create(
                         fileId=submission_folder_id,
                         body=permission,
-                        fields='id'
+                        fields='id',
+                        supportsAllDrives=True
                     ).execute()
                     print(f"✅ Shared folder with: {instructor_email}")
                 except Exception as share_error:
