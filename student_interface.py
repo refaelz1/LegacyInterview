@@ -12,7 +12,6 @@ from __future__ import annotations
 import difflib
 import json
 import os
-import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -1569,30 +1568,50 @@ def create_full_interface() -> gr.Blocks:
                     new_count,
                 )
                 
-                print("📤 Starting background upload thread...")
-                
-                # Upload to cloud services in background (non-blocking)
+                # Upload to cloud services (synchronous so user sees errors in logs)
                 student_name = user_name.strip() if user_name else "Anonymous"
-                threading.Thread(
-                    target=_upload_in_background,
-                    args=(
-                        student_name,
-                        cs.github_url,
-                        cs.original_code,
-                        cs.sabotaged_code,
-                        submitted_code,
-                        hint_log or [],
-                        result["total_score"],
-                        result["total_tests"],
-                        result["passed"],
-                        hints_used,
-                        result["all_passed"],
-                        cs.readme(),
-                        str(cs.target_path),
-                    ),
-                    daemon=True  # Thread dies when main program exits
-                ).start()
-                print("✅ Upload thread started")
+                
+                # Google Sheets (fast)
+                if GOOGLE_SHEETS_AVAILABLE:
+                    try:
+                        print("📊 Uploading to Google Sheets...")
+                        log_to_google_sheets(
+                            student_name=student_name,
+                            repo_url=cs.github_url,
+                            hints_used=hints_used,
+                            score=result["total_score"],
+                            total_tests=result["total_tests"],
+                            passed_tests=result["passed"],
+                            all_passed=result["all_passed"],
+                            chat_history=hint_log or [],
+                        )
+                        print(f"✅ Logged to Google Sheets: {student_name}")
+                    except Exception as e:
+                        print(f"⚠️ Google Sheets logging failed: {e}")
+                
+                # Google Drive (detailed backup)
+                if GOOGLE_DRIVE_AVAILABLE:
+                    try:
+                        print("📁 Uploading to Google Drive...")
+                        upload_submission_to_drive(
+                            student_name=student_name,
+                            repo_url=cs.github_url,
+                            original_code=cs.original_code,
+                            buggy_code=cs.sabotaged_code,
+                            student_code=submitted_code,
+                            chat_history=hint_log or [],
+                            score=result["total_score"],
+                            total_tests=result["total_tests"],
+                            passed_tests=result["passed"],
+                            hints_used=hints_used,
+                            challenge_prompt=cs.readme(),
+                            target_file=str(cs.target_path),
+                        )
+                        print(f"✅ Uploaded to Google Drive: {student_name}")
+                    except Exception as e:
+                        print(f"⚠️ Google Drive backup failed: {e}")
+                        import traceback
+                        traceback.print_exc()
             except Exception as exc:
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
                 yield (gr.update(), gr.update(), err, "", "", "", submit_count)
@@ -1856,27 +1875,50 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                     new_count,
                 )
                 
-                # Upload to cloud services in background (non-blocking)
-                threading.Thread(
-                    target=_upload_in_background,
-                    args=(
-                        "Anonymous (standalone mode)",
-                        cs.github_url,
-                        cs.original_code,
-                        cs.sabotaged_code,
-                        submitted_code,
-                        hint_log or [],
-                        result["total_score"],
-                        result["total_tests"],
-                        result["passed"],
-                        hints_used,
-                        result["all_passed"],
-                        cs.readme(),
-                        str(cs.target_path),
-                    ),
-                    daemon=True
-                ).start()
-                print("📤 Upload to cloud started in background...")
+                # Upload to cloud services (synchronous so errors are visible)
+                student_name = "Anonymous (standalone mode)"
+                
+                # Google Sheets (fast)
+                if GOOGLE_SHEETS_AVAILABLE:
+                    try:
+                        print("📊 Uploading to Google Sheets...")
+                        log_to_google_sheets(
+                            student_name=student_name,
+                            repo_url=cs.github_url,
+                            hints_used=hints_used,
+                            score=result["total_score"],
+                            total_tests=result["total_tests"],
+                            passed_tests=result["passed"],
+                            all_passed=result["all_passed"],
+                            chat_history=hint_log or [],
+                        )
+                        print(f"✅ Logged to Google Sheets: {student_name}")
+                    except Exception as e:
+                        print(f"⚠️ Google Sheets logging failed: {e}")
+                
+                # Google Drive (detailed backup)
+                if GOOGLE_DRIVE_AVAILABLE:
+                    try:
+                        print("📁 Uploading to Google Drive...")
+                        upload_submission_to_drive(
+                            student_name=student_name,
+                            repo_url=cs.github_url,
+                            original_code=cs.original_code,
+                            buggy_code=cs.sabotaged_code,
+                            student_code=submitted_code,
+                            chat_history=hint_log or [],
+                            score=result["total_score"],
+                            total_tests=result["total_tests"],
+                            passed_tests=result["passed"],
+                            hints_used=hints_used,
+                            challenge_prompt=cs.readme(),
+                            target_file=str(cs.target_path),
+                        )
+                        print(f"✅ Uploaded to Google Drive: {student_name}")
+                    except Exception as e:
+                        print(f"⚠️ Google Drive backup failed: {e}")
+                        import traceback
+                        traceback.print_exc()
             except Exception as exc:
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
                 yield (gr.update(), gr.update(), err, "", "", "", submit_count)

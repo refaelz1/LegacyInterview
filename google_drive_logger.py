@@ -52,11 +52,12 @@ def upload_submission_to_drive(
     
     # Check if Google Drive is configured
     folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
-    if not folder_id:
-        print("⚠️ Google Drive: GOOGLE_DRIVE_FOLDER_ID not set in environment")
-        return False  # Silently skip if not configured
+    use_shared_drive = bool(folder_id)  # If folder_id exists, assume it's a Shared Drive
     
-    print(f"📂 Google Drive Folder ID: {folder_id[:20]}...")  # First 20 chars only
+    if use_shared_drive:
+        print(f"📂 Using Shared Drive folder: {folder_id[:20]}...")
+    else:
+        print("📂 Creating standalone folder (no Shared Drive configured)")
     
     try:
         from googleapiclient.discovery import build
@@ -92,11 +93,38 @@ def upload_submission_to_drive(
         folder_metadata = {
             'name': folder_name,
             'mimeType': 'application/vnd.google-apps.folder',
-            'parents': [folder_id]
         }
+        
+        # Only add parent if using Shared Drive (otherwise create in Service Account's root)
+        if use_shared_drive:
+            folder_metadata['parents'] = [folder_id]
+        
         folder = service.files().create(body=folder_metadata, fields='id').execute()
         submission_folder_id = folder.get('id')
         print(f"✅ Folder created: {submission_folder_id}")
+        
+        # If not using Shared Drive, share the folder with a specific email
+        if not use_shared_drive:
+            # Get email from environment variable (instructor's email)
+            instructor_email = os.getenv("GOOGLE_DRIVE_SHARE_EMAIL")
+            if instructor_email:
+                try:
+                    permission = {
+                        'type': 'user',
+                        'role': 'writer',  # Can edit/view
+                        'emailAddress': instructor_email
+                    }
+                    service.permissions().create(
+                        fileId=submission_folder_id,
+                        body=permission,
+                        fields='id'
+                    ).execute()
+                    print(f"✅ Shared folder with: {instructor_email}")
+                except Exception as share_error:
+                    print(f"⚠️ Could not share folder: {share_error}")
+            else:
+                print(f"💡 Folder created but not shared (set GOOGLE_DRIVE_SHARE_EMAIL to auto-share)")
+                print(f"📎 Share manually: https://drive.google.com/drive/folders/{submission_folder_id}")
         
         # Prepare files to upload
         files_to_upload = [
