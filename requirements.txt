@@ -9,3 +9,4 @@ uvicorn[standard]
 gspread
 google-auth
 google-api-python-client
+google-auth-httplib2

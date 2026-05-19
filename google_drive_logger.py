@@ -8,6 +8,9 @@ Creates a comprehensive backup folder for each submission with:
 - Student's solution
 - Full chat history
 - Summary JSON
+
+NOTE: If running on Intel network with proxy, make sure http_proxy and https_proxy
+are set in environment variables. The Google API client will use them automatically.
 """
 
 import os
@@ -15,6 +18,12 @@ import json
 from datetime import datetime
 from typing import Optional
 from io import BytesIO
+
+# Ensure proxy settings are in environment
+if not os.getenv("http_proxy") and os.getenv("HTTP_PROXY"):
+    os.environ["http_proxy"] = os.environ["HTTP_PROXY"]
+if not os.getenv("https_proxy") and os.getenv("HTTPS_PROXY"):
+    os.environ["https_proxy"] = os.environ["HTTPS_PROXY"]
 
 
 def upload_submission_to_drive(
@@ -56,6 +65,8 @@ def upload_submission_to_drive(
         from googleapiclient.discovery import build
         from googleapiclient.http import MediaIoBaseUpload
         from google.oauth2.service_account import Credentials
+        from google_auth_httplib2 import AuthorizedHttp
+        import httplib2
         
         # Check if service account file exists
         service_account_file = "google-service-account.json"
@@ -69,7 +80,27 @@ def upload_submission_to_drive(
             'https://www.googleapis.com/auth/drive'
         ]
         creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
-        service = build('drive', 'v3', credentials=creds)
+        
+        # Create HTTP client with proxy support
+        proxy_info = None
+        if os.getenv("http_proxy"):
+            # Parse proxy from environment
+            proxy_url = os.getenv("http_proxy").replace("http://", "")
+            if ":" in proxy_url:
+                proxy_host, proxy_port = proxy_url.split(":")
+                proxy_info = httplib2.ProxyInfo(
+                    proxy_type=3,  # HTTP proxy
+                    proxy_host=proxy_host,
+                    proxy_port=int(proxy_port)
+                )
+        
+        http = httplib2.Http(proxy_info=proxy_info) if proxy_info else httplib2.Http()
+        
+        # Authorize the HTTP client
+        authorized_http = AuthorizedHttp(creds, http=http)
+        
+        # Build service
+        service = build('drive', 'v3', http=authorized_http)
         
         # Create submission folder name
         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
