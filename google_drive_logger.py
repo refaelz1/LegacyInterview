@@ -59,14 +59,15 @@ def upload_submission_to_drive(
     # Check if Google Drive is configured
     folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
     if not folder_id:
+        print("⚠️ Google Drive: GOOGLE_DRIVE_FOLDER_ID not set in environment")
         return False  # Silently skip if not configured
+    
+    print(f"📂 Google Drive Folder ID: {folder_id[:20]}...")  # First 20 chars only
     
     try:
         from googleapiclient.discovery import build
         from googleapiclient.http import MediaIoBaseUpload
         from google.oauth2.service_account import Credentials
-        from google_auth_httplib2 import AuthorizedHttp
-        import httplib2
         
         # Check if service account file exists
         service_account_file = "google-service-account.json"
@@ -74,38 +75,24 @@ def upload_submission_to_drive(
             print("⚠️ Google Drive: service account file not found")
             return False
         
-        # Authenticate
+        # Authenticate (simpler approach - let Google handle proxy)
         scopes = [
             'https://www.googleapis.com/auth/drive.file',
             'https://www.googleapis.com/auth/drive'
         ]
         creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
+        print("✅ Authenticated with service account")
         
-        # Create HTTP client with proxy support
-        proxy_info = None
-        if os.getenv("http_proxy"):
-            # Parse proxy from environment
-            proxy_url = os.getenv("http_proxy").replace("http://", "")
-            if ":" in proxy_url:
-                proxy_host, proxy_port = proxy_url.split(":")
-                proxy_info = httplib2.ProxyInfo(
-                    proxy_type=3,  # HTTP proxy
-                    proxy_host=proxy_host,
-                    proxy_port=int(proxy_port)
-                )
-        
-        http = httplib2.Http(proxy_info=proxy_info) if proxy_info else httplib2.Http()
-        
-        # Authorize the HTTP client
-        authorized_http = AuthorizedHttp(creds, http=http)
-        
-        # Build service
-        service = build('drive', 'v3', http=authorized_http)
+        # Build service (let googleapiclient handle HTTP internally)
+        service = build('drive', 'v3', credentials=creds)
+        print("✅ Drive service initialized")
         
         # Create submission folder name
         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
         repo_name = repo_url.split('/')[-1].replace('.git', '')
         folder_name = f"{timestamp}_{student_name}_{repo_name}"
+        
+        print(f"📁 Creating folder: {folder_name}")
         
         # Create folder in Drive
         folder_metadata = {
@@ -115,6 +102,7 @@ def upload_submission_to_drive(
         }
         folder = service.files().create(body=folder_metadata, fields='id').execute()
         submission_folder_id = folder.get('id')
+        print(f"✅ Folder created: {submission_folder_id}")
         
         # Prepare files to upload
         files_to_upload = [
@@ -161,7 +149,8 @@ def upload_submission_to_drive(
         ]
         
         # Upload each file
-        for file_info in files_to_upload:
+        print(f"📤 Uploading {len(files_to_upload)} files...")
+        for i, file_info in enumerate(files_to_upload, 1):
             file_metadata = {
                 'name': file_info['name'],
                 'parents': [submission_folder_id]
@@ -178,15 +167,18 @@ def upload_submission_to_drive(
                 media_body=media,
                 fields='id'
             ).execute()
+            print(f"  ✅ {i}/{len(files_to_upload)}: {file_info['name']}")
         
         print(f"✅ Uploaded to Google Drive: {folder_name}")
         return True
         
-    except ImportError:
-        print("⚠️ Google Drive: google-api-python-client not installed")
+    except ImportError as e:
+        print(f"⚠️ Google Drive: Missing library: {e}")
         return False
     except Exception as e:
-        print(f"⚠️ Google Drive upload failed: {e}")
+        print(f"⚠️ Google Drive upload failed: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
