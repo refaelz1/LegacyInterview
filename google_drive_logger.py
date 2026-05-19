@@ -75,6 +75,7 @@ def upload_submission_to_drive(
             'https://www.googleapis.com/auth/drive.file',
             'https://www.googleapis.com/auth/drive'
         ]
+        # creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
         creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
         print("✅ Authenticated with service account")
         
