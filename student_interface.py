@@ -27,6 +27,13 @@ try:
 except ImportError:
     GOOGLE_SHEETS_AVAILABLE = False
 
+# Optional Google Drive backup
+try:
+    from google_drive_logger import upload_submission_to_drive
+    GOOGLE_DRIVE_AVAILABLE = True
+except ImportError:
+    GOOGLE_DRIVE_AVAILABLE = False
+
 
 # ── API Key Validation ────────────────────────────────────────────────────────
 
@@ -1504,6 +1511,27 @@ def create_full_interface() -> gr.Blocks:
                         )
                     except Exception as e:
                         print(f"⚠️ Google Sheets logging failed: {e}")
+                
+                # Optional: Backup to Google Drive
+                if GOOGLE_DRIVE_AVAILABLE:
+                    try:
+                        student_name = user_name.strip() if user_name else "Anonymous"
+                        upload_submission_to_drive(
+                            student_name=student_name,
+                            repo_url=cs.github_url,
+                            original_code=cs.original_code,
+                            buggy_code=cs.sabotaged_code,
+                            student_code=submitted_code,
+                            chat_history=hint_log or [],
+                            score=result["total_score"],
+                            total_tests=result["total_tests"],
+                            passed_tests=result["passed"],
+                            hints_used=hints_used,
+                            challenge_prompt=cs.readme(),
+                            target_file=str(cs.target_path),
+                        )
+                    except Exception as e:
+                        print(f"⚠️ Google Drive backup failed: {e}")
 
                 score_html     = _score_summary_html(result)
                 combined_diff  = _combined_changes_html(cs, submitted_code)
@@ -1782,6 +1810,26 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                         )
                     except Exception as e:
                         print(f"⚠️ Google Sheets logging failed: {e}")
+                
+                # Optional: Backup to Google Drive
+                if GOOGLE_DRIVE_AVAILABLE:
+                    try:
+                        upload_submission_to_drive(
+                            student_name="Anonymous (standalone mode)",
+                            repo_url=cs.github_url,
+                            original_code=cs.original_code,
+                            buggy_code=cs.sabotaged_code,
+                            student_code=submitted_code,
+                            chat_history=hint_log or [],
+                            score=result["total_score"],
+                            total_tests=result["total_tests"],
+                            passed_tests=result["passed"],
+                            hints_used=hints_used,
+                            challenge_prompt=cs.readme(),
+                            target_file=str(cs.target_path),
+                        )
+                    except Exception as e:
+                        print(f"⚠️ Google Drive backup failed: {e}")
 
                 score_html    = _score_summary_html(result)
                 combined_diff = _combined_changes_html(cs, submitted_code)

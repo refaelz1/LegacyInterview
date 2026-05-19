@@ -8,3 +8,4 @@ pywebview
 uvicorn[standard]
 gspread
 google-auth
+google-api-python-client
