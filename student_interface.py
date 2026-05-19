@@ -1561,12 +1561,16 @@ def create_full_interface() -> gr.Blocks:
                 test_html      = _colorise_test_output(result["test_output"] or "No test output.")
                 hints_html     = _hints_html(hint_log or [])
 
+                print("✅ Results ready, returning to user...")
+                
                 # Return results to user IMMEDIATELY
                 yield (
                     gr.update(), gr.update(),
                     score_html, combined_diff, test_html, hints_html,
                     new_count,
                 )
+                
+                print("📤 Starting background upload thread...")
                 
                 # Upload to cloud services in background (non-blocking)
                 student_name = user_name.strip() if user_name else "Anonymous"
@@ -1589,7 +1593,7 @@ def create_full_interface() -> gr.Blocks:
                     ),
                     daemon=True  # Thread dies when main program exits
                 ).start()
-                print("📤 Upload to cloud started in background...")
+                print("✅ Upload thread started")
             except Exception as exc:
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
                 yield (gr.update(), gr.update(), err, "", "", "", submit_count)
