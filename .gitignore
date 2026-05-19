@@ -2,6 +2,8 @@
 *.pyc
 *.pyo
 .env
+.env.backup
+google-service-account.json
 workspaces/
 .claude/*
 **/__pycache__/

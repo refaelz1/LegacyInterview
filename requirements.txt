@@ -6,3 +6,5 @@ python-dotenv
 gradio
 pywebview
 uvicorn[standard]
+gspread
+google-auth

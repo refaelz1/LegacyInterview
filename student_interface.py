@@ -20,6 +20,13 @@ import gradio as gr
 from orchestrator.scoring import evaluate_submission
 from orchestrator.hint_graph import get_hint
 
+# Optional Google Sheets logging
+try:
+    from google_sheets_logger import log_to_google_sheets
+    GOOGLE_SHEETS_AVAILABLE = True
+except ImportError:
+    GOOGLE_SHEETS_AVAILABLE = False
+
 
 # ── API Key Validation ────────────────────────────────────────────────────────
 
@@ -1478,6 +1485,25 @@ def create_full_interface() -> gr.Blocks:
                 )
                 log.save(submitted_code, result, hints_used)
                 new_count = submit_count + 1
+                
+                # Optional: Log to Google Sheets
+                if GOOGLE_SHEETS_AVAILABLE:
+                    try:
+                        # Get student name from user_name_state if available
+                        student_name = "Student"  # Will be enhanced with actual name later
+                        log_to_google_sheets(
+                            student_name=student_name,
+                            repo_url=cs.github_url,
+                            hints_used=hints_used,
+                            score=result["total_score"],
+                            total_tests=result["total_tests"],
+                            passed_tests=result["passed"],
+                            all_passed=result["all_passed"],
+                            student_code=submitted_code,
+                            chat_history=hint_log or [],
+                        )
+                    except Exception as e:
+                        print(f"⚠️ Google Sheets logging failed: {e}")
 
                 score_html     = _score_summary_html(result)
                 combined_diff  = _combined_changes_html(cs, submitted_code)
