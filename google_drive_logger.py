@@ -176,22 +176,27 @@ def upload_submission_to_drive(
             try:
                 file_metadata = {
                     'name': file_info['name'],
-                    'parents': [submission_folder_id]
+                    'parents': [submission_folder_id],
+                    'mimeType': file_info['mime_type']
                 }
                 
                 # Create file content as bytes
                 file_content = file_info['content'].encode('utf-8')
+                
+                # Use simple media upload (not resumable)
                 media = MediaIoBaseUpload(
                     BytesIO(file_content),
                     mimetype=file_info['mime_type'],
-                    resumable=False  # Simple upload, not resumable
+                    resumable=False,
+                    chunksize=-1  # Upload in a single request
                 )
                 
                 # Upload file
                 uploaded_file = service.files().create(
                     body=file_metadata,
                     media_body=media,
-                    fields='id'
+                    fields='id',
+                    supportsAllDrives=True  # Support Shared Drives
                 ).execute()
                 
                 print(f"  ✅ {i}/{len(files_to_upload)}: {file_info['name']}")
