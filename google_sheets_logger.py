@@ -54,12 +54,37 @@ def log_to_google_sheets(
         # Open the sheet
         sheet = client.open_by_key(sheet_id).sheet1
         
+        # Initialize headers if this is the first time
+        try:
+            if not sheet.row_values(1):  # Empty sheet
+                headers = [
+                    "תאריך ושעה",
+                    "שם סטודנט",
+                    "GitHub Repository",
+                    "ציון",
+                    "הינטים",
+                    "טסטים שעברו",
+                    "הצליח?",
+                    "התכתבות עם הצ'אט",
+                    "הקוד שנשלח",
+                ]
+                sheet.append_row(headers)
+                # Make headers bold
+                sheet.format('A1:I1', {'textFormat': {'bold': True}})
+        except Exception as e:
+            print(f"⚠️ Could not set headers: {e}")
+        
         # Prepare row data
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Truncate long fields for readability
-        code_preview = student_code[:200] + "..." if len(student_code) > 200 else student_code
-        chat_summary = f"{len(chat_history)} messages" if chat_history else "No chat"
+        # Format chat history nicely
+        if chat_history:
+            chat_text = "\n\n".join([
+                f"הינט #{i+1}:\nשאלה: {msg.get('summary', 'N/A')}\nתשובה: {msg.get('response', 'N/A')}"
+                for i, msg in enumerate(chat_history)
+            ])
+        else:
+            chat_text = "לא השתמש בהינטים"
         
         row = [
             timestamp,
@@ -68,9 +93,9 @@ def log_to_google_sheets(
             score,
             hints_used,
             f"{passed_tests}/{total_tests}",
-            "✅" if all_passed else "❌",
-            code_preview,
-            chat_summary,
+            "✅ הצליח" if all_passed else "❌ לא הצליח",
+            chat_text,
+            student_code,  # Full code
         ]
         
         # Append row
