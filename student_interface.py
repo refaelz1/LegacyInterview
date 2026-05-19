@@ -91,7 +91,6 @@ def _upload_in_background(
                 total_tests=total_tests,
                 passed_tests=passed_tests,
                 all_passed=all_passed,
-                student_code=student_code,
                 chat_history=chat_history,
             )
             print(f"✅ Logged to Google Sheets: {student_name}")

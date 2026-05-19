@@ -18,7 +18,6 @@ def log_to_google_sheets(
     total_tests: int,
     passed_tests: int,
     all_passed: bool,
-    student_code: str,
     chat_history: list,
 ) -> bool:
     """
@@ -66,11 +65,10 @@ def log_to_google_sheets(
                     "טסטים שעברו",
                     "הצליח?",
                     "התכתבות עם הצ'אט",
-                    "הקוד שנשלח",
                 ]
                 sheet.append_row(headers)
                 # Make headers bold
-                sheet.format('A1:I1', {'textFormat': {'bold': True}})
+                sheet.format('A1:H1', {'textFormat': {'bold': True}})
         except Exception as e:
             print(f"⚠️ Could not set headers: {e}")
         
@@ -95,7 +93,6 @@ def log_to_google_sheets(
             f"{passed_tests}/{total_tests}",
             "✅ הצליח" if all_passed else "❌ לא הצליח",
             chat_text,
-            student_code,  # Full code
         ]
         
         # Append row
@@ -200,7 +197,6 @@ if __name__ == "__main__":
             total_tests=10,
             passed_tests=8,
             all_passed=False,
-            student_code="def test(): pass",
             chat_history=[{"role": "user", "content": "test"}],
         )
         

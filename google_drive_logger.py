@@ -19,12 +19,6 @@ from datetime import datetime
 from typing import Optional
 from io import BytesIO
 
-# Ensure proxy settings are in environment
-if not os.getenv("http_proxy") and os.getenv("HTTP_PROXY"):
-    os.environ["http_proxy"] = os.environ["HTTP_PROXY"]
-if not os.getenv("https_proxy") and os.getenv("HTTPS_PROXY"):
-    os.environ["https_proxy"] = os.environ["HTTPS_PROXY"]
-
 
 def upload_submission_to_drive(
     student_name: str,
@@ -75,7 +69,7 @@ def upload_submission_to_drive(
             print("⚠️ Google Drive: service account file not found")
             return False
         
-        # Authenticate (simpler approach - let Google handle proxy)
+        # Authenticate
         scopes = [
             'https://www.googleapis.com/auth/drive.file',
             'https://www.googleapis.com/auth/drive'
@@ -83,7 +77,7 @@ def upload_submission_to_drive(
         creds = Credentials.from_service_account_file(service_account_file, scopes=scopes)
         print("✅ Authenticated with service account")
         
-        # Build service (let googleapiclient handle HTTP internally)
+        # Build service
         service = build('drive', 'v3', credentials=creds)
         print("✅ Drive service initialized")
         
@@ -151,23 +145,30 @@ def upload_submission_to_drive(
         # Upload each file
         print(f"📤 Uploading {len(files_to_upload)} files...")
         for i, file_info in enumerate(files_to_upload, 1):
-            file_metadata = {
-                'name': file_info['name'],
-                'parents': [submission_folder_id]
-            }
-            
-            media = MediaIoBaseUpload(
-                BytesIO(file_info['content'].encode('utf-8')),
-                mimetype=file_info['mime_type'],
-                resumable=True
-            )
-            
-            service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id'
-            ).execute()
-            print(f"  ✅ {i}/{len(files_to_upload)}: {file_info['name']}")
+            try:
+                file_metadata = {
+                    'name': file_info['name'],
+                    'parents': [submission_folder_id]
+                }
+                
+                # Create file content as bytes
+                file_content = file_info['content'].encode('utf-8')
+                media = MediaIoBaseUpload(
+                    BytesIO(file_content),
+                    mimetype=file_info['mime_type'],
+                    resumable=False  # Simple upload, not resumable
+                )
+                
+                # Upload file
+                uploaded_file = service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id'
+                ).execute()
+                
+                print(f"  ✅ {i}/{len(files_to_upload)}: {file_info['name']}")
+            except Exception as file_error:
+                print(f"  ❌ {i}/{len(files_to_upload)}: {file_info['name']} - {file_error}")
         
         print(f"✅ Uploaded to Google Drive: {folder_name}")
         return True
