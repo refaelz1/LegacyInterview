@@ -1388,8 +1388,31 @@ def create_full_interface() -> gr.Blocks:
                 )
 
             except Exception as exc:
+                error_msg = str(exc)
+                
+                # Provide user-friendly error messages
+                if "verify_sabotage" in error_msg and "crashed" in error_msg:
+                    user_message = (
+                        "❌ Challenge generation failed: The bugs introduced caused all tests to crash.\n\n"
+                        "💡 **Suggestions:**\n"
+                        "• Try reducing the number of bugs (use 1-2 instead of 3)\n"
+                        "• Try a different repository with simpler code\n"
+                        "• Enable 'Debug Mode' to see detailed logs\n\n"
+                        f"Technical details: {error_msg}"
+                    )
+                elif "clone" in error_msg.lower():
+                    user_message = (
+                        "❌ Failed to clone repository.\n\n"
+                        "💡 **Check:**\n"
+                        "• Is the URL correct?\n"
+                        "• Is the repository public?\n\n"
+                        f"Details: {error_msg}"
+                    )
+                else:
+                    user_message = f"❌ Error: {error_msg}\n\n💡 Try enabling 'Debug Mode' for more details."
+                
                 yield (
-                    gr.update(visible=True, value=f"❌ Error: {exc}"),
+                    gr.update(visible=True, value=user_message),
                     gr.update(interactive=True),
                     gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
                     "", 0,
