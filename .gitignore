@@ -5,6 +5,7 @@
 .env.backup
 google-service-account.json
 workspaces/
+submissions_backup/
 .claude/*
 **/__pycache__/
 *.py[cod]

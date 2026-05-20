@@ -27,6 +27,20 @@ try:
 except ImportError:
     GOOGLE_SHEETS_AVAILABLE = False
 
+# Optional Git submissions backup
+try:
+    from git_submissions_logger import push_submission_to_git
+    GIT_SUBMISSIONS_AVAILABLE = True
+except ImportError:
+    GIT_SUBMISSIONS_AVAILABLE = False
+
+# Optional Git submissions backup
+try:
+    from git_submissions_logger import push_submission_to_git
+    GIT_SUBMISSIONS_AVAILABLE = True
+except ImportError:
+    GIT_SUBMISSIONS_AVAILABLE = False
+
 
 # ── API Key Validation ────────────────────────────────────────────────────────
 
@@ -1503,7 +1517,7 @@ def create_full_interface() -> gr.Blocks:
                 # Upload to cloud services (synchronous so user sees errors in logs)
                 student_name = user_name.strip() if user_name else "Anonymous"
                 
-                # Google Sheets (fast)
+                # Google Sheets (fast summary)
                 if GOOGLE_SHEETS_AVAILABLE:
                     try:
                         print("📊 Uploading to Google Sheets...")
@@ -1520,6 +1534,28 @@ def create_full_interface() -> gr.Blocks:
                         print(f"✅ Logged to Google Sheets: {student_name}")
                     except Exception as e:
                         print(f"⚠️ Google Sheets logging failed: {e}")
+                
+                # Git Submissions (detailed backup with all code)
+                if GIT_SUBMISSIONS_AVAILABLE:
+                    try:
+                        print("🔄 Pushing to Git repository...")
+                        push_submission_to_git(
+                            student_name=student_name,
+                            repo_url=cs.github_url,
+                            original_code=cs.original_code,
+                            buggy_code=cs.sabotaged_code,
+                            student_code=submitted_code,
+                            chat_history=hint_log or [],
+                            score=result["total_score"],
+                            total_tests=result["total_tests"],
+                            passed_tests=result["passed"],
+                            hints_used=hints_used,
+                            challenge_prompt=cs.readme(),
+                            target_file=cs.target_file,
+                        )
+                        print(f"✅ Pushed to Git: {student_name}")
+                    except Exception as e:
+                        print(f"⚠️ Git submission backup failed: {e}")
             except Exception as exc:
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
                 yield (gr.update(), gr.update(), err, "", "", "", submit_count)
@@ -1786,7 +1822,7 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                 # Upload to cloud services (synchronous so errors are visible)
                 student_name = "Anonymous (standalone mode)"
                 
-                # Google Sheets (fast)
+                # Google Sheets (fast summary)
                 if GOOGLE_SHEETS_AVAILABLE:
                     try:
                         print("📊 Uploading to Google Sheets...")
@@ -1803,6 +1839,28 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                         print(f"✅ Logged to Google Sheets: {student_name}")
                     except Exception as e:
                         print(f"⚠️ Google Sheets logging failed: {e}")
+                
+                # Git Submissions (detailed backup with all code)
+                if GIT_SUBMISSIONS_AVAILABLE:
+                    try:
+                        print("🔄 Pushing to Git repository...")
+                        push_submission_to_git(
+                            student_name=student_name,
+                            repo_url=cs.github_url,
+                            original_code=cs.original_code,
+                            buggy_code=cs.sabotaged_code,
+                            student_code=submitted_code,
+                            chat_history=hint_log or [],
+                            score=result["total_score"],
+                            total_tests=result["total_tests"],
+                            passed_tests=result["passed"],
+                            hints_used=hints_used,
+                            challenge_prompt=cs.readme(),
+                            target_file=cs.target_file,
+                        )
+                        print(f"✅ Pushed to Git: {student_name}")
+                    except Exception as e:
+                        print(f"⚠️ Git submission backup failed: {e}")
             except Exception as exc:
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
                 yield (gr.update(), gr.update(), err, "", "", "", submit_count)
