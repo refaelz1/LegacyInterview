@@ -1516,6 +1516,8 @@ def create_full_interface() -> gr.Blocks:
                 )
                 
                 # Upload to cloud services in BACKGROUND THREAD (non-blocking)
+                # TEMPORARILY DISABLED - Testing without cloud uploads
+                """
                 def _background_upload():
                     student_name = user_name.strip() if user_name else "Anonymous"
                     
@@ -1562,6 +1564,7 @@ def create_full_interface() -> gr.Blocks:
                 # Start background upload (won't block UI)
                 upload_thread = threading.Thread(target=_background_upload, daemon=True)
                 upload_thread.start()
+                """
             except Exception as exc:
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
                 yield (gr.update(), gr.update(), err, "", "", "", submit_count)
@@ -1826,6 +1829,8 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                 )
                 
                 # Upload to cloud services in BACKGROUND THREAD (non-blocking)
+                # TEMPORARILY DISABLED - Testing without cloud uploads
+                """
                 def _background_upload():
                     student_name = "Anonymous (standalone mode)"
                     
@@ -1872,6 +1877,7 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                 # Start background upload (won't block UI)
                 upload_thread = threading.Thread(target=_background_upload, daemon=True)
                 upload_thread.start()
+                """
             except Exception as exc:
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
                 yield (gr.update(), gr.update(), err, "", "", "", submit_count)
