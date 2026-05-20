@@ -12,6 +12,7 @@ from __future__ import annotations
 import difflib
 import json
 import os
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -1514,48 +1515,53 @@ def create_full_interface() -> gr.Blocks:
                     new_count,
                 )
                 
-                # Upload to cloud services (synchronous so user sees errors in logs)
-                student_name = user_name.strip() if user_name else "Anonymous"
+                # Upload to cloud services in BACKGROUND THREAD (non-blocking)
+                def _background_upload():
+                    student_name = user_name.strip() if user_name else "Anonymous"
+                    
+                    # Google Sheets (fast summary)
+                    if GOOGLE_SHEETS_AVAILABLE:
+                        try:
+                            print("📊 Uploading to Google Sheets...")
+                            log_to_google_sheets(
+                                student_name=student_name,
+                                repo_url=cs.github_url,
+                                hints_used=hints_used,
+                                score=result["total_score"],
+                                total_tests=result["total_tests"],
+                                passed_tests=result["passed"],
+                                all_passed=result["all_passed"],
+                                chat_history=hint_log or [],
+                            )
+                            print(f"✅ Logged to Google Sheets: {student_name}")
+                        except Exception as e:
+                            print(f"⚠️ Google Sheets logging failed: {e}")
+                    
+                    # Git Submissions (detailed backup with all code)
+                    if GIT_SUBMISSIONS_AVAILABLE:
+                        try:
+                            print("🔄 Pushing to Git repository...")
+                            push_submission_to_git(
+                                student_name=student_name,
+                                repo_url=cs.github_url,
+                                original_code=cs.original_code,
+                                buggy_code=cs.sabotaged_code,
+                                student_code=submitted_code,
+                                chat_history=hint_log or [],
+                                score=result["total_score"],
+                                total_tests=result["total_tests"],
+                                passed_tests=result["passed"],
+                                hints_used=hints_used,
+                                challenge_prompt=cs.readme(),
+                                target_file=cs.target_file,
+                            )
+                            print(f"✅ Pushed to Git: {student_name}")
+                        except Exception as e:
+                            print(f"⚠️ Git submission backup failed: {e}")
                 
-                # Google Sheets (fast summary)
-                if GOOGLE_SHEETS_AVAILABLE:
-                    try:
-                        print("📊 Uploading to Google Sheets...")
-                        log_to_google_sheets(
-                            student_name=student_name,
-                            repo_url=cs.github_url,
-                            hints_used=hints_used,
-                            score=result["total_score"],
-                            total_tests=result["total_tests"],
-                            passed_tests=result["passed"],
-                            all_passed=result["all_passed"],
-                            chat_history=hint_log or [],
-                        )
-                        print(f"✅ Logged to Google Sheets: {student_name}")
-                    except Exception as e:
-                        print(f"⚠️ Google Sheets logging failed: {e}")
-                
-                # Git Submissions (detailed backup with all code)
-                if GIT_SUBMISSIONS_AVAILABLE:
-                    try:
-                        print("🔄 Pushing to Git repository...")
-                        push_submission_to_git(
-                            student_name=student_name,
-                            repo_url=cs.github_url,
-                            original_code=cs.original_code,
-                            buggy_code=cs.sabotaged_code,
-                            student_code=submitted_code,
-                            chat_history=hint_log or [],
-                            score=result["total_score"],
-                            total_tests=result["total_tests"],
-                            passed_tests=result["passed"],
-                            hints_used=hints_used,
-                            challenge_prompt=cs.readme(),
-                            target_file=cs.target_file,
-                        )
-                        print(f"✅ Pushed to Git: {student_name}")
-                    except Exception as e:
-                        print(f"⚠️ Git submission backup failed: {e}")
+                # Start background upload (won't block UI)
+                upload_thread = threading.Thread(target=_background_upload, daemon=True)
+                upload_thread.start()
             except Exception as exc:
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
                 yield (gr.update(), gr.update(), err, "", "", "", submit_count)
@@ -1819,48 +1825,53 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                     new_count,
                 )
                 
-                # Upload to cloud services (synchronous so errors are visible)
-                student_name = "Anonymous (standalone mode)"
+                # Upload to cloud services in BACKGROUND THREAD (non-blocking)
+                def _background_upload():
+                    student_name = "Anonymous (standalone mode)"
+                    
+                    # Google Sheets (fast summary)
+                    if GOOGLE_SHEETS_AVAILABLE:
+                        try:
+                            print("📊 Uploading to Google Sheets...")
+                            log_to_google_sheets(
+                                student_name=student_name,
+                                repo_url=cs.github_url,
+                                hints_used=hints_used,
+                                score=result["total_score"],
+                                total_tests=result["total_tests"],
+                                passed_tests=result["passed"],
+                                all_passed=result["all_passed"],
+                                chat_history=hint_log or [],
+                            )
+                            print(f"✅ Logged to Google Sheets: {student_name}")
+                        except Exception as e:
+                            print(f"⚠️ Google Sheets logging failed: {e}")
+                    
+                    # Git Submissions (detailed backup with all code)
+                    if GIT_SUBMISSIONS_AVAILABLE:
+                        try:
+                            print("🔄 Pushing to Git repository...")
+                            push_submission_to_git(
+                                student_name=student_name,
+                                repo_url=cs.github_url,
+                                original_code=cs.original_code,
+                                buggy_code=cs.sabotaged_code,
+                                student_code=submitted_code,
+                                chat_history=hint_log or [],
+                                score=result["total_score"],
+                                total_tests=result["total_tests"],
+                                passed_tests=result["passed"],
+                                hints_used=hints_used,
+                                challenge_prompt=cs.readme(),
+                                target_file=cs.target_file,
+                            )
+                            print(f"✅ Pushed to Git: {student_name}")
+                        except Exception as e:
+                            print(f"⚠️ Git submission backup failed: {e}")
                 
-                # Google Sheets (fast summary)
-                if GOOGLE_SHEETS_AVAILABLE:
-                    try:
-                        print("📊 Uploading to Google Sheets...")
-                        log_to_google_sheets(
-                            student_name=student_name,
-                            repo_url=cs.github_url,
-                            hints_used=hints_used,
-                            score=result["total_score"],
-                            total_tests=result["total_tests"],
-                            passed_tests=result["passed"],
-                            all_passed=result["all_passed"],
-                            chat_history=hint_log or [],
-                        )
-                        print(f"✅ Logged to Google Sheets: {student_name}")
-                    except Exception as e:
-                        print(f"⚠️ Google Sheets logging failed: {e}")
-                
-                # Git Submissions (detailed backup with all code)
-                if GIT_SUBMISSIONS_AVAILABLE:
-                    try:
-                        print("🔄 Pushing to Git repository...")
-                        push_submission_to_git(
-                            student_name=student_name,
-                            repo_url=cs.github_url,
-                            original_code=cs.original_code,
-                            buggy_code=cs.sabotaged_code,
-                            student_code=submitted_code,
-                            chat_history=hint_log or [],
-                            score=result["total_score"],
-                            total_tests=result["total_tests"],
-                            passed_tests=result["passed"],
-                            hints_used=hints_used,
-                            challenge_prompt=cs.readme(),
-                            target_file=cs.target_file,
-                        )
-                        print(f"✅ Pushed to Git: {student_name}")
-                    except Exception as e:
-                        print(f"⚠️ Git submission backup failed: {e}")
+                # Start background upload (won't block UI)
+                upload_thread = threading.Thread(target=_background_upload, daemon=True)
+                upload_thread.start()
             except Exception as exc:
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
                 yield (gr.update(), gr.update(), err, "", "", "", submit_count)
