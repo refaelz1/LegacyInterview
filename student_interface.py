@@ -12,7 +12,9 @@ from __future__ import annotations
 import difflib
 import json
 import os
+import sys
 import threading
+from io import StringIO
 from datetime import datetime
 from pathlib import Path
 
@@ -1289,6 +1291,17 @@ def create_full_interface() -> gr.Blocks:
 
                 with gr.Tab("💡 Hints Used"):
                     results_hints_html = gr.HTML("")
+            
+            # Debug console (collapsible)
+            with gr.Accordion("🐛 Debug Console", open=False):
+                debug_console = gr.Textbox(
+                    label="Execution Logs",
+                    lines=15,
+                    max_lines=30,
+                    interactive=False,
+                    show_copy_button=True,
+                    placeholder="Debug logs will appear here...",
+                )
 
         # ── Login callback ────────────────────────────────────────────────
         
@@ -1473,21 +1486,36 @@ def create_full_interface() -> gr.Blocks:
             return cs.sabotaged_code, gr.update(selected=1)
 
         def on_submit(hints_used, submit_count, workspace_path, hint_log, user_name):
-            _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
-            yield (
-                gr.update(visible=False),
-                gr.update(visible=True),
-                _loading, "", "", "",
-                submit_count,
-            )
-            if not workspace_path:
-                yield (gr.update(), gr.update(), "No challenge loaded.", "", "", "", submit_count)
-                return
+            # Capture all print statements for debug console
+            log_capture = StringIO()
+            original_stdout = sys.stdout
+            sys.stdout = log_capture
+            
             try:
+                _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
+                sys.stdout = original_stdout  # Restore for yield
+                yield (
+                    gr.update(visible=False),
+                    gr.update(visible=True),
+                    _loading, "", "", "",
+                    submit_count,
+                    "",  # debug console
+                )
+                sys.stdout = log_capture  # Capture again
+                
+                if not workspace_path:
+                    sys.stdout = original_stdout
+                    yield (gr.update(), gr.update(), "No challenge loaded.", "", "", "", submit_count, log_capture.getvalue())
+                    return
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Starting submission evaluation...")
                 cs  = ChallengeState(workspace_path)
                 log = SubmissionLog(cs.workspace)
-                # Always read from disk — catches changes made in local IDE (e.g. VS Code)
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 📖 Reading submitted code...")
                 submitted_code = cs.read_target()
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 🧪 Running tests...")
                 result = evaluate_submission(
                     workspace_path=workspace_path,
                     student_code=submitted_code,
@@ -1498,21 +1526,29 @@ def create_full_interface() -> gr.Blocks:
                     target_file=str(cs.target_path),
                     bug_func_names=cs.bug_func_names,
                 )
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 💾 Saving submission...")
                 log.save(submitted_code, result, hints_used)
                 new_count = submit_count + 1
 
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 📊 Generating results...")
                 score_html     = _score_summary_html(result)
                 combined_diff  = _combined_changes_html(cs, submitted_code)
                 test_html      = _colorise_test_output(result["test_output"] or "No test output.")
                 hints_html     = _hints_html(hint_log or [])
 
-                print("✅ Results ready, returning to user...")
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ Results ready, returning to user...")
+                
+                # Get all captured logs
+                debug_logs = log_capture.getvalue()
+                sys.stdout = original_stdout  # Restore stdout
                 
                 # Return results to user IMMEDIATELY
                 yield (
                     gr.update(), gr.update(),
                     score_html, combined_diff, test_html, hints_html,
                     new_count,
+                    debug_logs,
                 )
                 
                 # Upload to cloud services in BACKGROUND THREAD (non-blocking)
@@ -1566,8 +1602,14 @@ def create_full_interface() -> gr.Blocks:
                 upload_thread.start()
                 """
             except Exception as exc:
+                import traceback
+                error_details = traceback.format_exc()
+                debug_logs = log_capture.getvalue() + f"\n\n❌ ERROR:\n{error_details}"
+                sys.stdout = original_stdout  # Restore stdout
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
-                yield (gr.update(), gr.update(), err, "", "", "", submit_count)
+                yield (gr.update(), gr.update(), err, "", "", "", submit_count, debug_logs)
+            finally:
+                sys.stdout = original_stdout  # Always restore stdout
 
         def on_send(message, history, hints_used, submit_count, workspace_path, hint_log, confirmation_pending):
             if not message.strip():
@@ -1633,6 +1675,7 @@ def create_full_interface() -> gr.Blocks:
                 results_test_html,
                 results_hints_html,
                 submission_count_state,
+                debug_console,
             ],
         )
         send_btn.click(
@@ -1759,6 +1802,17 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
 
                 with gr.Tab("💡 Hints Used"):
                     results_hints_html = gr.HTML("")
+            
+            # Debug console (collapsible)
+            with gr.Accordion("🐛 Debug Console", open=False):
+                debug_console_standalone = gr.Textbox(
+                    label="Execution Logs",
+                    lines=15,
+                    max_lines=30,
+                    interactive=False,
+                    show_copy_button=True,
+                    placeholder="Debug logs will appear here...",
+                )
 
         # ── Callbacks ─────────────────────────────────────────────────────
 
@@ -1793,16 +1847,28 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
             return cs.sabotaged_code, gr.update(selected=1)
 
         def on_submit(hints_used, submit_count, hint_log):
-            _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
-            yield (
-                gr.update(visible=False),
-                gr.update(visible=True),
-                _loading, "", "", "",
-                submit_count,
-            )
+            # Capture all print statements for debug console
+            log_capture = StringIO()
+            original_stdout = sys.stdout
+            sys.stdout = log_capture
+            
             try:
-                # Always read from disk — catches changes made in local IDE (e.g. VS Code)
+                _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
+                sys.stdout = original_stdout  # Restore for yield
+                yield (
+                    gr.update(visible=False),
+                    gr.update(visible=True),
+                    _loading, "", "", "",
+                    submit_count,
+                    "",  # debug console
+                )
+                sys.stdout = log_capture  # Capture again
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Starting submission evaluation (standalone mode)...")
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 📖 Reading submitted code...")
                 submitted_code = cs.read_target()
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 🧪 Running tests...")
                 result = evaluate_submission(
                     workspace_path=workspace_path,
                     student_code=submitted_code,
@@ -1813,19 +1879,29 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                     target_file=str(cs.target_path),
                     bug_func_names=cs.bug_func_names,
                 )
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 💾 Saving submission...")
                 log.save(submitted_code, result, hints_used)
                 new_count = submit_count + 1
 
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 📊 Generating results...")
                 score_html    = _score_summary_html(result)
                 combined_diff = _combined_changes_html(cs, submitted_code)
                 test_html     = _colorise_test_output(result["test_output"] or "No test output.")
                 hints_html    = _hints_html(hint_log or [])
 
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ Results ready, returning to user...")
+                
+                # Get all captured logs
+                debug_logs = log_capture.getvalue()
+                sys.stdout = original_stdout  # Restore stdout
+                
                 # Return results to user IMMEDIATELY
                 yield (
                     gr.update(), gr.update(),
                     score_html, combined_diff, test_html, hints_html,
                     new_count,
+                    debug_logs,
                 )
                 
                 # Upload to cloud services in BACKGROUND THREAD (non-blocking)
@@ -1879,8 +1955,14 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                 upload_thread.start()
                 """
             except Exception as exc:
+                import traceback
+                error_details = traceback.format_exc()
+                debug_logs = log_capture.getvalue() + f"\n\n❌ ERROR:\n{error_details}"
+                sys.stdout = original_stdout  # Restore stdout
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
-                yield (gr.update(), gr.update(), err, "", "", "", submit_count)
+                yield (gr.update(), gr.update(), err, "", "", "", submit_count, debug_logs)
+            finally:
+                sys.stdout = original_stdout  # Always restore stdout
 
         def on_send(message, history, hints_used, submit_count, hint_log, confirmation_pending):
             if not message.strip():
@@ -1932,6 +2014,7 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                 results_test_html,
                 results_hints_html,
                 submission_count_state,
+                debug_console_standalone,
             ],
         )
         send_btn.click(
