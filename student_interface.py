@@ -1299,7 +1299,6 @@ def create_full_interface() -> gr.Blocks:
                     lines=15,
                     max_lines=30,
                     interactive=False,
-                    show_copy_button=True,
                     placeholder="Debug logs will appear here...",
                 )
 
@@ -1833,7 +1832,6 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                     lines=15,
                     max_lines=30,
                     interactive=False,
-                    show_copy_button=True,
                     placeholder="Debug logs will appear here...",
                 )
 
