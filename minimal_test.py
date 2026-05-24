@@ -125,14 +125,32 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
         with gr.Tab("⚙️ Setup", id=1):
             gr.Markdown("# ⚙️ Setup Challenge")
             url_input = gr.Textbox(label="GitHub URL", value="https://github.com/mahmoud/boltons")
-            num_bugs = gr.Slider(1, 5, value=3, step=1, label="Number of Bugs")
+            with gr.Row():
+                num_bugs = gr.Slider(1, 5, value=3, step=1, label="Number of Bugs")
+                nesting_slider = gr.Slider(1, 6, value=2, step=1, label="Nesting Level (call-chain depth)")
+            with gr.Row():
+                refactoring_check = gr.Checkbox(label="🔀 Enable Refactoring", value=False)
+                debug_check = gr.Checkbox(label="🐞 Debug Mode", value=False)
             start_btn = gr.Button("Start Challenge ➡️", variant="primary", size="lg")
             status_md = gr.Markdown("")
         
         # Tab 2: Challenge
         with gr.Tab("💻 Challenge", id=2):
             gr.Markdown("# 💻 Fix the Code")
-            code_box = gr.Textbox(label="Code", lines=20, interactive=True)
+            
+            with gr.Tabs() as challenge_tabs:
+                # Sub-tab: README
+                with gr.Tab("📋 Challenge", id=0):
+                    readme_md = gr.Markdown("Challenge description will appear here...")
+                
+                # Sub-tab: Code Editor
+                with gr.Tab("💻 Code Editor", id=1):
+                    code_box = gr.Textbox(label="Code", lines=20, interactive=True)
+                
+                # Sub-tab: Chat/Hints (placeholder for now)
+                with gr.Tab("💬 Chat", id=2):
+                    gr.Markdown("💡 Chat for hints will be available here...")
+            
             submit_btn = gr.Button("Submit ➡️", variant="primary", size="lg")
         
         # Tab 3: Results
@@ -151,16 +169,17 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     
     def on_start(url, bugs):
         logger.info(f"Starting: {url}, bugs={bugs}")
-        yield gr.Tabs(selected=1), "⏳ Creating challenge...", "", ""
+        yield gr.Tabs(selected=1), "⏳ Creating challenge...", "", "", ""
         
         try:
             workspace = _run_pipeline(url.strip(), nesting_level=2, num_bugs=int(bugs))
             cs = ChallengeState(workspace)
             code = cs.read_target()
-            yield gr.Tabs(selected=2), f"✅ Ready! File: {cs.target_file}", code, workspace
+            readme = cs.readme()
+            yield gr.Tabs(selected=2), f"✅ Ready! File: {cs.target_file}", readme, code, workspace
         except Exception as exc:
             logger.error(f"Pipeline failed: {exc}", exc_info=True)
-            yield gr.Tabs(selected=1), f"❌ Error: {exc}", "", ""
+            yield gr.Tabs(selected=1), f"❌ Error: {exc}", "", "", ""
     
     def on_submit(workspace):
         logger.info(f"Submit: workspace={workspace}")
@@ -209,7 +228,7 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     
     # Wire events
     login_btn.click(on_login, inputs=[name_input, api_input], outputs=[tabs])
-    start_btn.click(on_start, inputs=[url_input, num_bugs], outputs=[tabs, status_md, code_box, workspace_state])
+    start_btn.click(on_start, inputs=[url_input, num_bugs], outputs=[tabs, status_md, readme_md, code_box, workspace_state])
     submit_btn.click(on_submit, inputs=[workspace_state], outputs=[tabs, score_html, tests_html])
 
 demo.queue()
