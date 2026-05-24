@@ -32,11 +32,11 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
         gr.Markdown("# 💻 תקן את הקוד")
         gr.Markdown("הקוד להלן מכיל באגים. תקן אותם ולחץ על 'שלח'")
         
-        code_display = gr.Code(
+        code_display = gr.Textbox(
             label="קוד עם באגים",
-            language="python",
             lines=20,
-            value="# הקוד יוצג כאן לאחר יצירת האתגר\nprint('Hello World')"
+            value="# הקוד יוצג כאן לאחר יצירת האתגר\ndef hello():\n    print('Hello World')\n\nhello()",
+            max_lines=30
         )
         
         submit_btn = gr.Button("שלח פתרון ➡️", variant="primary", size="lg")
