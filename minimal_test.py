@@ -22,7 +22,8 @@ with gr.Blocks(title="Legacy Code Challenge - Test") as demo:
     with gr.Column(visible=False) as page3:
         gr.Markdown("# 💻 עמוד האתגר")
         gr.Markdown("כאן תקבל את הקוד המקולקל")
-        code_area = gr.Code(value="# Your buggy code here\nprint('Hello')", language="python")
+        gr.Markdown("```python\n# Your buggy code here\nprint('Hello')\n```")
+        gr.Textbox(label="ערוך את הקוד כאן", lines=10, value="# Fix the bugs here\nprint('Hello')")
         btn3 = gr.Button("שלח ➡️", variant="primary", size="lg")
     
     # Page 4: Results
@@ -65,6 +66,9 @@ with gr.Blocks(title="Legacy Code Challenge - Test") as demo:
     btn1.click(fn=switch_to_setup, inputs=[], outputs=[page1, page2, page3, page4])
     btn2.click(fn=switch_to_challenge, inputs=[], outputs=[page1, page2, page3, page4])
     btn3.click(fn=switch_to_results, inputs=[], outputs=[page1, page2, page3, page4])
+
+# Enable queue for server compatibility
+demo.queue()
 
 if __name__ == "__main__":
     demo.launch(share=False, inbrowser=True)
