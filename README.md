@@ -2,7 +2,7 @@
 title: Legacy Code Challenge
 emoji: 🐛
 colorFrom: red
-colorTo: orange
+colorTo: pink
 sdk: gradio
 sdk_version: "5.9.1"
 app_file: app.py
