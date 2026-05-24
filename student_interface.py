@@ -1352,11 +1352,15 @@ def create_full_interface() -> gr.Blocks:
 
         # ── Setup callback ─────────────────────────────────────────────────
 
-        def on_start(name, url, nesting_lvl, num_bugs, refactoring, debug, timer_mins, user_name_from_login):
+        def on_start(name, url, nesting_lvl, num_bugs, refactoring, debug, timer_mins, user_name_from_login, user_api_key):
             nesting = int(nesting_lvl)
             
             # Use login name if available, otherwise name from setup form
             name_str = user_name_from_login.strip() if user_name_from_login else name.strip()
+            
+            # Ensure API key is set in environment (critical for pipeline)
+            if user_api_key:
+                os.environ["OPENAI_API_KEY"] = user_api_key
 
             yield (
                 gr.update(visible=True,
@@ -1364,7 +1368,6 @@ def create_full_interface() -> gr.Blocks:
                                 " this may take 1–2 minutes."),
                 gr.update(interactive=False),
                 gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
-                "", 0,
             )
 
             try:
@@ -1415,7 +1418,6 @@ def create_full_interface() -> gr.Blocks:
                     gr.update(visible=True, value=user_message),
                     gr.update(interactive=True),
                     gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
-                    "", 0,
                 )
 
         # ── Wiring for login ──────────────────────────────────────────────
@@ -1441,7 +1443,7 @@ def create_full_interface() -> gr.Blocks:
         
         start_btn.click(
             on_start,
-            inputs=[name_box, url_box, nesting_slider, bugs_slider, refactoring_check, debug_check, timer_slider, user_name_state],
+            inputs=[name_box, url_box, nesting_slider, bugs_slider, refactoring_check, debug_check, timer_slider, user_name_state, user_api_key_state],
             outputs=[
                 status_box, start_btn,
                 setup_page, challenge_page,
@@ -1568,7 +1570,7 @@ def create_full_interface() -> gr.Blocks:
                 
                 # Return results to user IMMEDIATELY
                 yield (
-                    gr.update(), gr.update(),
+                    gr.update(visible=False), gr.update(visible=True),
                     score_html, combined_diff, test_html, hints_html,
                     new_count,
                     debug_logs,
@@ -1630,7 +1632,7 @@ def create_full_interface() -> gr.Blocks:
                 debug_logs = log_capture.getvalue() + f"\n\n❌ ERROR:\n{error_details}"
                 sys.stdout = original_stdout  # Restore stdout
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
-                yield (gr.update(), gr.update(), err, "", "", "", submit_count, debug_logs)
+                yield (gr.update(visible=False), gr.update(visible=True), err, "", "", "", submit_count, debug_logs)
             finally:
                 sys.stdout = original_stdout  # Always restore stdout
 
@@ -1921,7 +1923,7 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                 
                 # Return results to user IMMEDIATELY
                 yield (
-                    gr.update(), gr.update(),
+                    gr.update(visible=False), gr.update(visible=True),
                     score_html, combined_diff, test_html, hints_html,
                     new_count,
                     debug_logs,
@@ -1983,7 +1985,7 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
                 debug_logs = log_capture.getvalue() + f"\n\n❌ ERROR:\n{error_details}"
                 sys.stdout = original_stdout  # Restore stdout
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
-                yield (gr.update(), gr.update(), err, "", "", "", submit_count, debug_logs)
+                yield (gr.update(visible=False), gr.update(visible=True), err, "", "", "", submit_count, debug_logs)
             finally:
                 sys.stdout = original_stdout  # Always restore stdout
 
