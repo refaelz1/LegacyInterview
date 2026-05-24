@@ -1,0 +1,10 @@
+langchain-openai
+langgraph
+langchain-core
+gitpython
+python-dotenv
+gradio
+pywebview
+uvicorn[standard]
+gspread
+google-auth
