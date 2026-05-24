@@ -9,8 +9,89 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Import challenge state handler
-from challenge import ChallengeState
+# ── ChallengeState (copied from student_interface.py) ────────────────────────
+
+class ChallengeState:
+    """Loads and exposes data from challenge_state.json."""
+
+    def __init__(self, workspace_path: str) -> None:
+        self.workspace = Path(workspace_path)
+        state_file = self.workspace / "challenge_state.json"
+        if not state_file.exists():
+            raise FileNotFoundError(f"challenge_state.json not found in {workspace_path}")
+        with open(state_file, encoding="utf-8") as f:
+            data = json.load(f)
+
+        self.github_url = data.get("github_url", "")
+        raw_target = data.get("target_file", "")
+        try:
+            self.target_file = Path(raw_target).resolve().relative_to(self.workspace.resolve()).as_posix()
+        except (ValueError, OSError):
+            self.target_file = Path(raw_target).as_posix()
+        self.original_code = data.get("original_code", "")
+        self.sabotaged_code = data.get("sabotaged_code", "")
+        self.function_name = data.get("function_name", "")
+        self.bug_func_name = data.get("bug_func_name", "")
+        
+        # sabotaged_files
+        snapshot_dir = self.workspace / ".metadata"
+        snap_files = {}
+        if snapshot_dir.exists():
+            target_rel_from_json = data.get("target_file", "")
+            if target_rel_from_json:
+                try:
+                    target_abs = Path(target_rel_from_json).resolve()
+                    target_rel = target_abs.relative_to(self.workspace.resolve()).as_posix()
+                except (ValueError, OSError):
+                    target_rel = Path(target_rel_from_json).as_posix()
+                
+                expected_snapshot_name = target_rel.replace("/", "__")
+                snapshot_path = snapshot_dir / expected_snapshot_name
+                
+                if snapshot_path.exists():
+                    try:
+                        snap_files[target_rel] = snapshot_path.read_text(encoding="utf-8")
+                    except Exception:
+                        pass
+
+        if snap_files:
+            self.sabotaged_files = snap_files
+        else:
+            stored = data.get("sabotaged_files", {})
+            if not stored and self.sabotaged_code:
+                try:
+                    rel = Path(self.target_file).resolve().relative_to(self.workspace.resolve()).as_posix()
+                except ValueError:
+                    rel = Path(self.target_file).name
+                stored = {rel: self.sabotaged_code}
+            self.sabotaged_files = stored
+
+    @property
+    def target_path(self) -> Path:
+        return self.workspace / self.target_file
+
+    def read_target(self) -> str:
+        if self.target_path.exists():
+            return self.target_path.read_text(encoding="utf-8")
+        return self.sabotaged_code
+
+    def write_target(self, code: str) -> None:
+        self.target_path.write_text(code, encoding="utf-8")
+
+    def list_py_files(self) -> list[str]:
+        files = sorted(self.workspace.rglob("*.py"))
+        return [
+            f.relative_to(self.workspace).as_posix() for f in files
+            if ".metadata" not in f.parts
+        ]
+
+    def readme(self) -> str:
+        readme_path = self.workspace / "STUDENT_README.md"
+        if readme_path.exists():
+            return readme_path.read_text(encoding="utf-8")
+        return "# Challenge\n\nREADME not found."
+
+# ── Pipeline function (copied from student_interface.py) ─────────────────────
 
 def _run_pipeline(github_url: str, nesting_level: int, num_bugs: int, 
                   refactoring_enabled: bool = False, debug_mode: bool = False) -> str:
