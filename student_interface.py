@@ -1276,6 +1276,18 @@ def create_full_interface() -> gr.Blocks:
 
                     gr.Markdown("---")
                     submit_btn = gr.Button("🚀 Submit Fix", variant="primary")
+            
+            # Live Debug Console (always visible at bottom)
+            gr.Markdown("---")
+            with gr.Accordion("🐛 Live Debug Console", open=False):
+                live_debug_console = gr.Textbox(
+                    label="Real-time Execution Logs",
+                    lines=10,
+                    max_lines=20,
+                    interactive=False,
+                    placeholder="Debug logs will appear here during submission...",
+                    elem_id="live-debug-console"
+                )
 
         # ════════════════════════════════════════════════════════════════════
         # PAGE 3 — Results (hidden until Submit clicked)
@@ -1529,12 +1541,13 @@ def create_full_interface() -> gr.Blocks:
                     _loading, "", "", "",
                     submit_count,
                     "",  # debug console
+                    "⏳ Starting submission evaluation...",  # live debug
                 )
                 sys.stdout = log_capture  # Capture again
                 
                 if not workspace_path:
                     sys.stdout = original_stdout
-                    yield (gr.update(), gr.update(), "No challenge loaded.", "", "", "", submit_count, log_capture.getvalue())
+                    yield (gr.update(), gr.update(), "No challenge loaded.", "", "", "", submit_count, log_capture.getvalue(), "❌ No workspace loaded")
                     return
                 
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Starting submission evaluation...")
@@ -1578,6 +1591,7 @@ def create_full_interface() -> gr.Blocks:
                     score_html, combined_diff, test_html, hints_html,
                     new_count,
                     debug_logs,
+                    debug_logs,  # live debug (same)
                 )
                 
                 # Upload to cloud services in BACKGROUND THREAD (non-blocking)
@@ -1636,7 +1650,7 @@ def create_full_interface() -> gr.Blocks:
                 debug_logs = log_capture.getvalue() + f"\n\n❌ ERROR:\n{error_details}"
                 sys.stdout = original_stdout  # Restore stdout
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
-                yield (gr.update(visible=False), gr.update(visible=True), err, "", "", "", submit_count, debug_logs)
+                yield (gr.update(visible=False), gr.update(visible=True), err, "", "", "", submit_count, debug_logs, debug_logs)
             finally:
                 sys.stdout = original_stdout  # Always restore stdout
 
@@ -1705,6 +1719,7 @@ def create_full_interface() -> gr.Blocks:
                 results_hints_html,
                 submission_count_state,
                 debug_console,
+                live_debug_console,
             ],
         )
         send_btn.click(
