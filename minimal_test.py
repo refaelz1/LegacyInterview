@@ -243,14 +243,14 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
         logger.info(f"User logged in: {name}")
         return gr.Tabs(selected=1)
     
-    def on_start(url, bugs, refactoring, debug):
-        logger.info(f"Starting: {url}, bugs={bugs}, refactoring={refactoring}, debug={debug}")
+    def on_start(url, bugs, nesting, refactoring, debug):
+        logger.info(f"Starting: {url}, bugs={bugs}, nesting={nesting}, refactoring={refactoring}, debug={debug}")
         yield gr.Tabs(selected=1), "⏳ Creating challenge...", "", "", ""
         
         try:
             workspace = _run_pipeline(
                 url.strip(), 
-                nesting_level=2, 
+                nesting_level=int(nesting), 
                 num_bugs=int(bugs),
                 refactoring_enabled=refactoring,
                 debug_mode=debug
@@ -433,7 +433,7 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     # ── Wire events ───────────────────────────────────────────────────────────────
     
     login_btn.click(on_login, inputs=[name_input, api_input], outputs=[tabs])
-    start_btn.click(on_start, inputs=[url_input, num_bugs, refactoring_check, debug_check], outputs=[tabs, status_md, readme_md, code_box, workspace_state])
+    start_btn.click(on_start, inputs=[url_input, num_bugs, nesting_slider, refactoring_check, debug_check], outputs=[tabs, status_md, readme_md, code_box, workspace_state])
     
     # Code Editor Tools
     run_tests_btn.click(on_run_tests, inputs=[code_box, workspace_state], outputs=[test_output_box])
