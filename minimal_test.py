@@ -2,14 +2,89 @@
 import gradio as gr
 import os
 import logging
+import json
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Import the real pipeline
-from architect.challenge_deployer import run_pipeline as _run_pipeline
+# Import challenge state handler
 from challenge import ChallengeState
+
+def _run_pipeline(github_url: str, nesting_level: int, num_bugs: int, 
+                  refactoring_enabled: bool = False, debug_mode: bool = False) -> str:
+    """Invoke the architect pipeline and return the workspace path."""
+    from architect.graph import build_graph
+
+    graph = build_graph()
+    result = graph.invoke({
+        "github_url":          github_url,
+        "nesting_level":       nesting_level,
+        "refactoring_enabled": refactoring_enabled,
+        "debug_mode":          debug_mode,
+        "num_bugs":            num_bugs,
+        "clone_path":          "",
+        "target_file":         "",
+        "original_code":       "",
+        "sabotaged_code":      "",
+        "function_name":       "",
+        "test_args":           "",
+        "expected_output":     "",
+        "actual_output":       "",
+        "bug_description":     "",
+        "detailed_explanation": "",
+        "challenge_summary":   "",
+        "test_cases":          [],
+        "public_tests":        [],
+        "secret_tests":        [],
+        "candidate_files":     [],
+        "bug_func_name":       "",
+        "bug_func_source":     "",
+        "call_chain":          {},
+    })
+
+    workspace_path = result["clone_path"]
+    target_file_rel = result.get("target_file", "")
+    actual_sabotaged_code = result.get("sabotaged_code", "")
+    
+    workspace_path_obj = Path(workspace_path).resolve()
+    if target_file_rel:
+        target_path = Path(workspace_path) / target_file_rel
+        if target_path.exists():
+            actual_sabotaged_code = target_path.read_text(encoding="utf-8")
+
+    sabotaged_files: dict[str, str] = {}
+    if target_file_rel and actual_sabotaged_code:
+        try:
+            rel_posix = Path(target_file_rel).resolve().relative_to(workspace_path_obj).as_posix()
+        except (ValueError, OSError):
+            rel_posix = Path(target_file_rel).as_posix()
+        sabotaged_files[rel_posix] = actual_sabotaged_code
+
+    # Persist challenge_state.json
+    challenge_state = {
+        "github_url":          github_url,
+        "workspace_path":      workspace_path,
+        "target_file":         target_file_rel,
+        "original_code":       result.get("original_code", ""),
+        "sabotaged_code":      actual_sabotaged_code,
+        "sabotaged_files":     sabotaged_files,
+        "function_name":       result.get("function_name", ""),
+        "bug_func_name":       result.get("bug_func_name", ""),
+        "test_cases":          result.get("test_cases", []),
+        "public_tests":        result.get("public_tests", []),
+        "secret_tests":        result.get("secret_tests", []),
+        "nesting_level":       nesting_level,
+        "refactoring_enabled": refactoring_enabled,
+        "debug_mode":          debug_mode,
+        "bug_description":     result.get("bug_description", ""),
+    }
+    state_path = Path(workspace_path) / "challenge_state.json"
+    with open(state_path, "w", encoding="utf-8") as f:
+        json.dump(challenge_state, f, indent=2, ensure_ascii=False)
+
+    return workspace_path
 
 with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     
