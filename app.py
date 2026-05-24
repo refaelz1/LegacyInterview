@@ -68,11 +68,10 @@ if __name__ == "__main__":
             server_port=port,
             share=False,
             inbrowser=False,
+            show_error=True,
         )
+        logger.info("✅ Gradio server started successfully!")
     except Exception as e:
         logger.error(f"❌ Launch failed: {e}", exc_info=True)
         raise
-        show_error=True,
-    )
-    
-    print("✅ Gradio server started successfully!")
+
