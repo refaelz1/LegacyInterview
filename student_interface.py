@@ -1564,25 +1564,16 @@ def create_full_interface() -> gr.Blocks:
             logger.info(f"User: {user_name}, Hints: {hints_used}, Submit#: {submit_count}")
             logger.info(f"Workspace: {workspace_path}")
             
-            try:
-                logger.info("Yielding initial loading state...")
-                # First yield IMMEDIATELY: Show loading state (before any logic that might fail)
-                _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
-                yield (
-                    gr.update(visible=False),
-                    gr.update(visible=True),
-                    _loading, "", "", "",  # Show loading message
-                    submit_count,
-                    "",  # debug console
-                    "Starting submission evaluation...",  # live debug
-                )
-                logger.info("Initial yield complete")
-            except Exception as init_exc:
-                logger.error(f"Initial yield failed: {init_exc}", exc_info=True)
-                # If even the first yield fails, show error
-                err = f"<p style='color:#ef4444;'>❌ Initialization error: {init_exc}</p>"
-                yield (gr.update(), gr.update(), err, "", "", "", submit_count, str(init_exc), str(init_exc))
-                return
+            # First yield IMMEDIATELY (like on_start): Show loading WITHOUT changing visibility
+            _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
+            yield (
+                gr.update(),  # challenge_page - no change yet
+                gr.update(),  # results_page - no change yet
+                _loading, "", "", "",  # Show loading message in results area
+                submit_count,
+                "",  # debug console
+                "Starting submission evaluation...",  # live debug
+            )
             
             # Capture all print statements for debug console
             log_capture = StringIO()
@@ -1593,7 +1584,7 @@ def create_full_interface() -> gr.Blocks:
                 
                 if not workspace_path:
                     sys.stdout = original_stdout
-                    yield (gr.update(), gr.update(), "No challenge loaded.", "", "", "", submit_count, log_capture.getvalue(), "❌ No workspace loaded")
+                    yield (gr.update(visible=False), gr.update(visible=True), "No challenge loaded.", "", "", "", submit_count, log_capture.getvalue(), "❌ No workspace loaded")
                     return
                 
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Starting submission evaluation...")
@@ -1779,6 +1770,11 @@ def create_full_interface() -> gr.Blocks:
             outputs=[chatbot, chat_input, hints_used_state, hint_counter, hint_log_state, confirmation_pending_state],
         )
 
+    # CRITICAL: Enable queue for generator functions to work on production servers
+    # max_size: Maximum queue size to prevent overflow
+    # default_concurrency_limit: Number of requests processed in parallel
+    demo.queue(max_size=20, default_concurrency_limit=10)
+    
     return demo
 
 
@@ -2118,4 +2114,8 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
             outputs=[chatbot, chat_input, hints_used_state, hint_counter, hint_log_state, confirmation_pending_state],
         )
 
+    # CRITICAL: Enable queue for generator functions to work on production servers
+    # max_size: Maximum queue size | default_concurrency_limit: Parallel requests
+    demo.queue(max_size=20, default_concurrency_limit=10)
+    
     return demo
