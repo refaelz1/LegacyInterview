@@ -12,8 +12,43 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Import required modules from student_interface
+# Import required modules
 from orchestrator.scoring import evaluate_submission
+from orchestrator.hint_graph import get_hint
+from architect.graph import build_graph
+
+# ── Hint Penalty System ──────────────────────────────────────────────────────
+
+PENALTY_TABLE = [0, 2, 6, 12, 20, 30]
+
+_HINT_DECLINES = {
+    "no", "nope", "nah", "not now", "nevermind", "never mind",
+    "no thanks", "no thank you", "skip", "cancel", "forget it",
+    "don't", "dont", "no hint", "stop",
+}
+_CONFIRMATION_KWS = ["would you like", "shall i", "want me to", "proceed", "penalty to your score"]
+
+def _hint_md(hints_used: int, penalty: int) -> str:
+    return (
+        f"🤖 **AI Assistant** &nbsp;|&nbsp; "
+        f"Hints used: **{hints_used}** &nbsp;|&nbsp; Penalty: **{penalty} pts** &nbsp; "
+        f"_(−2 / −6 / −12 / −20 / −30)_"
+    )
+
+def _is_decline(msg: str) -> bool:
+    m = msg.strip().lower()
+    return (
+        m in _HINT_DECLINES
+        or m.startswith("no ")
+        or m.startswith("don't")
+        or m.startswith("dont")
+        or m.startswith("nope ")
+        or m.startswith("nah ")
+    )
+
+def _is_confirmation_question(text: str) -> bool:
+    t = text.lower()
+    return any(kw in t for kw in _CONFIRMATION_KWS)
 
 # ── ChallengeState ──────────────────────────────────────────────────────────
 
@@ -35,6 +70,12 @@ class ChallengeState:
         self.sabotaged_code = data.get("sabotaged_code", "")
         self.bug_func_name = data.get("bug_func_name", "")
         self.bug_func_names = data.get("bug_func_names", [])
+        self.bug_func_sources_list = data.get("bug_func_sources_list", [])
+        self.original_bug_func_sources_list = data.get("original_bug_func_sources_list", [])
+        self.function_name = data.get("function_name", "")
+        self.nesting_level = data.get("nesting_level", 3)
+        self.refactoring_enabled = data.get("refactoring_enabled", False)
+        self.debug_mode = data.get("debug_mode", False)
     
     @property
     def target_path(self) -> Path:
@@ -50,6 +91,21 @@ class ChallengeState:
         if readme_path.exists():
             return readme_path.read_text(encoding="utf-8")
         return "# Challenge\n\nREADME not found."
+    
+    def challenge_info(self) -> dict:
+        """Return challenge metadata for the hint system."""
+        return {
+            "function_name":                  self.function_name,
+            "bug_func_name":                  self.bug_func_name,
+            "target_file":                    self.target_file,
+            "nesting_level":                  self.nesting_level,
+            "refactoring_enabled":            self.refactoring_enabled,
+            "debug_mode":                     self.debug_mode,
+            "bug_func_names":                 self.bug_func_names,
+            "bug_func_sources_list":          self.bug_func_sources_list,
+            "original_bug_func_sources_list": self.original_bug_func_sources_list,
+            "original_code":                  self.original_code,
+        }
 
 # ── Pipeline function ───────────────────────────────────────────────────────
 
@@ -92,6 +148,8 @@ def _run_pipeline(github_url: str, nesting_level: int, num_bugs: int,
         "function_name": result.get("function_name", ""),
         "bug_func_name": result.get("bug_func_name", ""),
         "bug_func_names": result.get("bug_func_names", []),
+        "bug_func_sources_list": result.get("bug_func_sources_list", []),
+        "original_bug_func_sources_list": result.get("original_bug_func_sources_list", []),
         "test_cases": result.get("test_cases", []),
         "public_tests": result.get("public_tests", []),
         "secret_tests": result.get("secret_tests", []),
@@ -147,11 +205,20 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
                 with gr.Tab("💻 Code Editor", id=1):
                     code_box = gr.Textbox(label="Code", lines=20, interactive=True)
                 
-                # Sub-tab: Chat/Hints (placeholder for now)
+                # Sub-tab: Chat/Hints
                 with gr.Tab("💬 Chat", id=2):
-                    gr.Markdown("💡 Chat for hints will be available here...")
+                    hint_status_md = gr.Markdown(_hint_md(0, 0))
+                    chatbot = gr.Chatbot(label="AI Assistant", type="messages", height=400)
+                    msg_input = gr.Textbox(label="Ask for help", placeholder="Type your question...", lines=2)
+                    send_btn = gr.Button("Send 💬", variant="primary")
             
             submit_btn = gr.Button("Submit ➡️", variant="primary", size="lg")
+        
+        # Hidden state variables for hints and scoring
+        hints_used_state = gr.State(0)
+        hint_log_state = gr.State([])
+        confirmation_pending_state = gr.State(False)
+        submission_count_state = gr.State(0)
         
         # Tab 3: Results
         with gr.Tab("🎯 Results", id=3):
@@ -181,15 +248,15 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
             logger.error(f"Pipeline failed: {exc}", exc_info=True)
             yield gr.Tabs(selected=1), f"❌ Error: {exc}", "", "", ""
     
-    def on_submit(workspace):
-        logger.info(f"Submit: workspace={workspace}")
+    def on_submit(workspace, hints_used, submit_count):
+        logger.info(f"Submit clicked (hints={hints_used}, attempt={submit_count+1})")
         
         # Move to results tab immediately
-        yield gr.Tabs(selected=3), "<p style='text-align:center;padding:40px;'>⏳ Running tests...</p>", ""
+        yield gr.Tabs(selected=3), "<p style='text-align:center;padding:40px;'>⏳ Running tests...</p>", "", submit_count
         
         try:
             if not workspace:
-                yield gr.Tabs(selected=3), "❌ No challenge loaded", ""
+                yield gr.Tabs(selected=3), "❌ No challenge loaded", "", submit_count
                 return
             
             cs = ChallengeState(workspace)
@@ -200,36 +267,95 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
                 student_code=submitted_code,
                 original_code=cs.original_code,
                 bug_func_name=cs.bug_func_name,
-                hints_used=0,
+                hints_used=hints_used,
                 sabotaged_code=cs.sabotaged_code,
                 target_file=str(cs.target_path),
                 bug_func_names=cs.bug_func_names,
             )
             
-            score = result.get("total_score", 0)
+            # Apply hint penalty
+            penalty = PENALTY_TABLE[min(hints_used, len(PENALTY_TABLE) - 1)]
+            base_score = result.get("total_score", 0)
+            final_score = max(0, base_score - penalty)
             passed = result.get("passed", 0)
             total = result.get("total_tests", 0)
             
             score_html_content = f"""
             <div style='padding:30px;background:#e8f5e9;border-radius:10px;text-align:center;'>
-                <h1 style='color:green;margin:0;'>Score: {score}/100</h1>
+                <h1 style='color:green;margin:0;'>Final Score: {final_score}/100</h1>
                 <p style='font-size:1.2em;margin-top:10px;'>✅ {passed}/{total} tests passed</p>
+                <p style='margin-top:10px;'>Base Score: {base_score} | Hint Penalty: -{penalty} | Hints Used: {hints_used}</p>
             </div>
             """
             
             tests_output = result.get("test_output", "No test output")
             tests_html_content = f"<pre style='background:#f5f5f5;padding:20px;border-radius:5px;'>{tests_output}</pre>"
             
-            yield gr.Tabs(selected=3), score_html_content, tests_html_content
+            yield gr.Tabs(selected=3), score_html_content, tests_html_content, submit_count + 1
             
         except Exception as exc:
             logger.error(f"Submission failed: {exc}", exc_info=True)
-            yield gr.Tabs(selected=3), f"❌ Error: {exc}", ""
+            yield gr.Tabs(selected=3), f"❌ Error: {exc}", "", submit_count
     
-    # Wire events
+    # ── Chat Handler ──────────────────────────────────────────────────────────────
+    
+    def on_send(message, history, hints_used, submit_count, workspace_path, hint_log, confirmation_pending):
+        if not message.strip():
+            penalty = PENALTY_TABLE[min(hints_used, len(PENALTY_TABLE) - 1)]
+            return history, "", hints_used, _hint_md(hints_used, penalty), hint_log, confirmation_pending
+        
+        if not workspace_path:
+            history = list(history or []) + [
+                {"role": "user", "content": message},
+                {"role": "assistant", "content": "No challenge loaded yet."},
+            ]
+            return history, "", hints_used, _hint_md(hints_used, 0), hint_log, False
+        
+        cs = ChallengeState(workspace_path)
+        result = get_hint(
+            user_message=message,
+            history=history,
+            hints_used=hints_used,
+            submission_attempts=submit_count,
+            challenge_info=cs.challenge_info(),
+        )
+        
+        # Check if hint was given
+        accepted_pending = confirmation_pending and not _is_decline(message)
+        gave_hint = result["gave_hint"] or accepted_pending
+        new_confirmation_pending = not gave_hint and _is_confirmation_question(result["response"])
+        
+        history = list(history or []) + [
+            {"role": "user", "content": message},
+            {"role": "assistant", "content": result["response"]},
+        ]
+        new_hints = hints_used + (1 if gave_hint else 0)
+        penalty = PENALTY_TABLE[min(new_hints, len(PENALTY_TABLE) - 1)]
+        new_log = list(hint_log or [])
+        if gave_hint:
+            new_log.append({"summary": result.get("hint_summary", ""), "response": result["response"]})
+        
+        return history, "", new_hints, _hint_md(new_hints, penalty), new_log, new_confirmation_pending
+    
+    # ── Wire events ───────────────────────────────────────────────────────────────
+    
     login_btn.click(on_login, inputs=[name_input, api_input], outputs=[tabs])
     start_btn.click(on_start, inputs=[url_input, num_bugs], outputs=[tabs, status_md, readme_md, code_box, workspace_state])
-    submit_btn.click(on_submit, inputs=[workspace_state], outputs=[tabs, score_html, tests_html])
+    
+    # Chat
+    send_btn.click(
+        on_send,
+        inputs=[msg_input, chatbot, hints_used_state, submission_count_state, workspace_state, hint_log_state, confirmation_pending_state],
+        outputs=[chatbot, msg_input, hints_used_state, hint_status_md, hint_log_state, confirmation_pending_state]
+    )
+    msg_input.submit(
+        on_send,
+        inputs=[msg_input, chatbot, hints_used_state, submission_count_state, workspace_state, hint_log_state, confirmation_pending_state],
+        outputs=[chatbot, msg_input, hints_used_state, hint_status_md, hint_log_state, confirmation_pending_state]
+    )
+    
+    # Submit
+    submit_btn.click(on_submit, inputs=[workspace_state, hints_used_state, submission_count_state], outputs=[tabs, score_html, tests_html, submission_count_state])
 
 demo.queue()
 
