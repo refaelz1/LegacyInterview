@@ -151,7 +151,7 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     
     def on_start(url, bugs):
         logger.info(f"Starting: {url}, bugs={bugs}")
-        yield gr.Tabs(selected=1), "⏳ Creating challenge...", ""
+        yield gr.Tabs(selected=1), "⏳ Creating challenge...", "", ""
         
         try:
             workspace = _run_pipeline(url.strip(), nesting_level=2, num_bugs=int(bugs))
