@@ -106,6 +106,10 @@ class ChallengeState:
             "original_bug_func_sources_list": self.original_bug_func_sources_list,
             "original_code":                  self.original_code,
         }
+    
+    def write_target(self, code: str) -> None:
+        """Write code to the target file."""
+        self.target_path.write_text(code, encoding="utf-8")
 
 # ── Pipeline function ───────────────────────────────────────────────────────
 
@@ -204,11 +208,16 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
                 # Sub-tab: Code Editor
                 with gr.Tab("💻 Code Editor", id=1):
                     code_box = gr.Textbox(label="Code", lines=20, interactive=True)
+                    with gr.Row():
+                        run_tests_btn = gr.Button("▶️ Run Tests", variant="secondary")
+                        show_diff_btn = gr.Button("📊 Show Changes", variant="secondary")
+                    test_output_box = gr.HTML(label="Test Results", visible=False)
+                    diff_output_box = gr.HTML(label="Code Changes", visible=False)
                 
                 # Sub-tab: Chat/Hints
                 with gr.Tab("💬 Chat", id=2):
                     hint_status_md = gr.Markdown(_hint_md(0, 0))
-                    chatbot = gr.Chatbot(label="AI Assistant", type="messages", height=400)
+                    chatbot = gr.Chatbot(label="AI Assistant", height=400)
                     msg_input = gr.Textbox(label="Ask for help", placeholder="Type your question...", lines=2)
                     send_btn = gr.Button("Send 💬", variant="primary")
             
@@ -234,12 +243,18 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
         logger.info(f"User logged in: {name}")
         return gr.Tabs(selected=1)
     
-    def on_start(url, bugs):
-        logger.info(f"Starting: {url}, bugs={bugs}")
+    def on_start(url, bugs, refactoring, debug):
+        logger.info(f"Starting: {url}, bugs={bugs}, refactoring={refactoring}, debug={debug}")
         yield gr.Tabs(selected=1), "⏳ Creating challenge...", "", "", ""
         
         try:
-            workspace = _run_pipeline(url.strip(), nesting_level=2, num_bugs=int(bugs))
+            workspace = _run_pipeline(
+                url.strip(), 
+                nesting_level=2, 
+                num_bugs=int(bugs),
+                refactoring_enabled=refactoring,
+                debug_mode=debug
+            )
             cs = ChallengeState(workspace)
             code = cs.read_target()
             readme = cs.readme()
@@ -248,7 +263,7 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
             logger.error(f"Pipeline failed: {exc}", exc_info=True)
             yield gr.Tabs(selected=1), f"❌ Error: {exc}", "", "", ""
     
-    def on_submit(workspace, hints_used, submit_count):
+    def on_submit(workspace, code, hints_used, submit_count):
         logger.info(f"Submit clicked (hints={hints_used}, attempt={submit_count+1})")
         
         # Move to results tab immediately
@@ -260,11 +275,13 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
                 return
             
             cs = ChallengeState(workspace)
-            submitted_code = cs.read_target()
+            
+            # Save the current code first
+            cs.write_target(code)
             
             result = evaluate_submission(
                 workspace_path=workspace,
-                student_code=submitted_code,
+                student_code=code,
                 original_code=cs.original_code,
                 bug_func_name=cs.bug_func_name,
                 hints_used=hints_used,
@@ -297,6 +314,85 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
             logger.error(f"Submission failed: {exc}", exc_info=True)
             yield gr.Tabs(selected=3), f"❌ Error: {exc}", "", submit_count
     
+    # ── Run Tests Handler ─────────────────────────────────────────────────────────
+    
+    def on_run_tests(code, workspace_path):
+        if not workspace_path:
+            return gr.HTML("<p style='color:red;'>No challenge loaded</p>", visible=True)
+        
+        try:
+            # Save current code
+            cs = ChallengeState(workspace_path)
+            cs.write_target(code)
+            
+            # Run evaluation to get test results
+            result = evaluate_submission(
+                workspace_path=workspace_path,
+                student_code=code,
+                original_code=cs.original_code,
+                bug_func_name=cs.bug_func_name,
+                hints_used=0,
+                sabotaged_code=cs.sabotaged_code,
+                target_file=str(cs.target_path),
+                bug_func_names=cs.bug_func_names,
+            )
+            
+            test_output = result.get("test_output", "No test output")
+            passed = result.get("passed", 0)
+            total = result.get("total_tests", 0)
+            
+            # Format output with colors
+            html = f"""<div style='background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:8px;'>
+                <h3 style='color:#3b82f6;margin-top:0;'>✅ {passed}/{total} tests passed</h3>
+                <pre style='margin:0;white-space:pre-wrap;'>{test_output}</pre>
+            </div>"""
+            return gr.HTML(html, visible=True)
+        except Exception as exc:
+            logger.error(f"Run tests failed: {exc}", exc_info=True)
+            return gr.HTML(f"<p style='color:red;'>Error: {exc}</p>", visible=True)
+    
+    # ── Show Diff Handler ─────────────────────────────────────────────────────────
+    
+    def on_show_diff(code, workspace_path):
+        if not workspace_path:
+            return gr.HTML("<p style='color:red;'>No challenge loaded</p>", visible=True)
+        
+        try:
+            import difflib
+            cs = ChallengeState(workspace_path)
+            original = cs.sabotaged_code
+            current = code
+            
+            # Generate unified diff
+            diff = difflib.unified_diff(
+                original.splitlines(keepends=True),
+                current.splitlines(keepends=True),
+                fromfile='Original (with bugs)',
+                tofile='Your changes',
+                lineterm=''
+            )
+            diff_text = ''.join(diff)
+            
+            if not diff_text:
+                html = "<p style='color:#22c55e;'>No changes yet</p>"
+            else:
+                # Colorize diff
+                lines = []
+                for line in diff_text.split('\n'):
+                    if line.startswith('+') and not line.startswith('+++'):
+                        lines.append(f'<span style="color:#22c55e;font-weight:bold;">{line}</span>')
+                    elif line.startswith('-') and not line.startswith('---'):
+                        lines.append(f'<span style="color:#ef4444;font-weight:bold;">{line}</span>')
+                    elif line.startswith('@@'):
+                        lines.append(f'<span style="color:#3b82f6;font-weight:bold;">{line}</span>')
+                    else:
+                        lines.append(f'<span>{line}</span>')
+                html = f"<pre style='background:#1e1e1e;padding:15px;border-radius:8px;overflow-y:auto;max-height:400px;'>{chr(10).join(lines)}</pre>"
+            
+            return gr.HTML(html, visible=True)
+        except Exception as exc:
+            return gr.HTML(f"<p style='color:red;'>Error: {exc}</p>", visible=True)
+    
     # ── Chat Handler ──────────────────────────────────────────────────────────────
     
     def on_send(message, history, hints_used, submit_count, workspace_path, hint_log, confirmation_pending):
@@ -305,10 +401,8 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
             return history, "", hints_used, _hint_md(hints_used, penalty), hint_log, confirmation_pending
         
         if not workspace_path:
-            history = list(history or []) + [
-                {"role": "user", "content": message},
-                {"role": "assistant", "content": "No challenge loaded yet."},
-            ]
+            history = list(history or [])
+            history.append([message, "No challenge loaded yet."])
             return history, "", hints_used, _hint_md(hints_used, 0), hint_log, False
         
         cs = ChallengeState(workspace_path)
@@ -325,10 +419,9 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
         gave_hint = result["gave_hint"] or accepted_pending
         new_confirmation_pending = not gave_hint and _is_confirmation_question(result["response"])
         
-        history = list(history or []) + [
-            {"role": "user", "content": message},
-            {"role": "assistant", "content": result["response"]},
-        ]
+        # Gradio Chatbot format: list of [user_msg, bot_msg] pairs
+        history = list(history or [])
+        history.append([message, result["response"]])
         new_hints = hints_used + (1 if gave_hint else 0)
         penalty = PENALTY_TABLE[min(new_hints, len(PENALTY_TABLE) - 1)]
         new_log = list(hint_log or [])
@@ -340,7 +433,11 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     # ── Wire events ───────────────────────────────────────────────────────────────
     
     login_btn.click(on_login, inputs=[name_input, api_input], outputs=[tabs])
-    start_btn.click(on_start, inputs=[url_input, num_bugs], outputs=[tabs, status_md, readme_md, code_box, workspace_state])
+    start_btn.click(on_start, inputs=[url_input, num_bugs, refactoring_check, debug_check], outputs=[tabs, status_md, readme_md, code_box, workspace_state])
+    
+    # Code Editor Tools
+    run_tests_btn.click(on_run_tests, inputs=[code_box, workspace_state], outputs=[test_output_box])
+    show_diff_btn.click(on_show_diff, inputs=[code_box, workspace_state], outputs=[diff_output_box])
     
     # Chat
     send_btn.click(
@@ -355,7 +452,7 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     )
     
     # Submit
-    submit_btn.click(on_submit, inputs=[workspace_state, hints_used_state, submission_count_state], outputs=[tabs, score_html, tests_html, submission_count_state])
+    submit_btn.click(on_submit, inputs=[workspace_state, code_box, hints_used_state, submission_count_state], outputs=[tabs, score_html, tests_html, submission_count_state])
 
 demo.queue()
 
