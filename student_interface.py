@@ -14,11 +14,23 @@ import json
 import os
 import sys
 import threading
+import logging
 from io import StringIO
 from datetime import datetime
 from pathlib import Path
 
 import gradio as gr
+
+# Configure detailed logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.FileHandler('app.log', encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 from orchestrator.scoring import evaluate_submission
 from orchestrator.hint_graph import get_hint
@@ -49,23 +61,31 @@ except ImportError:
 
 def validate_openai_key(api_key: str) -> tuple[bool, str]:
     """Validate OpenAI API key by making a test call."""
+    logger.info("Validating OpenAI API key...")
+    
     if not api_key or not api_key.startswith("sk-"):
+        logger.warning("Invalid API key format")
         return False, "❌ Invalid API key format. Must start with 'sk-'"
     
     try:
         os.environ["OPENAI_API_KEY"] = api_key
         from langchain_openai import ChatOpenAI
+        logger.info("Making test call to OpenAI...")
         llm = ChatOpenAI(model="gpt-4o", temperature=0, request_timeout=5, max_tokens=5)
         llm.invoke("test")
+        logger.info("✅ API key validated successfully")
         return True, "✅ API key validated!"
     except Exception as e:
         error = str(e)
+        logger.warning(f"API key validation failed: {error}")
         if "401" in error or "Incorrect API key" in error:
             return False, "❌ Invalid API key"
         elif "quota" in error.lower():
             return False, "⚠️ API key valid but no quota remaining"
         elif "timeout" in error.lower():
+            logger.info("Validation timed out but accepting key")
             return True, "✅ Key accepted (validation timed out - will verify during use)"
+        logger.info("Couldn't fully verify but accepting key")
         return True, "✅ Key accepted (couldn't fully verify)"
 
 
@@ -1367,6 +1387,11 @@ def create_full_interface() -> gr.Blocks:
         # ── Setup callback ─────────────────────────────────────────────────
 
         def on_start(name, url, nesting_lvl, num_bugs, refactoring, debug, timer_mins, user_name_from_login, user_api_key):
+            logger.info(f"=== START CHALLENGE ===")
+            logger.info(f"User: {user_name_from_login or name}")
+            logger.info(f"URL: {url}")
+            logger.info(f"Nesting: {nesting_lvl}, Bugs: {num_bugs}, Refactoring: {refactoring}, Debug: {debug}")
+            
             nesting = int(nesting_lvl)
             
             # Use login name if available, otherwise name from setup form
@@ -1374,8 +1399,12 @@ def create_full_interface() -> gr.Blocks:
             
             # Ensure API key is set in environment (critical for pipeline)
             if user_api_key:
+                logger.info("Setting OPENAI_API_KEY from user login")
                 os.environ["OPENAI_API_KEY"] = user_api_key
+            else:
+                logger.warning("No user_api_key provided!")
 
+            logger.info("Yielding loading message...")
             yield (
                 gr.update(visible=True,
                           value="⏳ Cloning repository and generating challenge…"
@@ -1385,12 +1414,17 @@ def create_full_interface() -> gr.Blocks:
             )
 
             try:
+                logger.info(f"Starting pipeline for {url.strip()}")
                 workspace_path = _run_pipeline(url.strip(), nesting, int(num_bugs), refactoring, debug)
+                logger.info(f"Pipeline completed. Workspace: {workspace_path}")
+                
                 cs       = ChallengeState(workspace_path)
                 py_files = cs.list_py_files()
                 default  = cs.target_file if cs.target_file in py_files else (py_files[0] if py_files else "")
                 suffix   = f" &nbsp;|&nbsp; {name_str}" if name_str else ""
 
+                logger.info(f"Challenge ready! Target file: {cs.target_file}, {len(py_files)} Python files")
+                
                 yield (
                     gr.update(visible=False),
                     gr.update(interactive=True),
@@ -1405,6 +1439,7 @@ def create_full_interface() -> gr.Blocks:
                 )
 
             except Exception as exc:
+                logger.error(f"Pipeline failed: {exc}", exc_info=True)
                 error_msg = str(exc)
                 
                 # Provide user-friendly error messages
@@ -1525,6 +1560,10 @@ def create_full_interface() -> gr.Blocks:
             return cs.sabotaged_code, gr.update(selected=1)
 
         def on_submit(hints_used, submit_count, workspace_path, hint_log, user_name):
+            logger.info(f"=== SUBMIT CHALLENGE ===")
+            logger.info(f"User: {user_name}, Hints: {hints_used}, Submit#: {submit_count}")
+            logger.info(f"Workspace: {workspace_path}")
+            
             # ULTRA-SIMPLE TEST: Just show SOMETHING immediately
             test_msg = f"""
             <div style='padding:20px;background:#1e1e1e;color:#fff;border-radius:8px;'>
@@ -1538,6 +1577,7 @@ def create_full_interface() -> gr.Blocks:
             """
             
             try:
+                logger.info("Yielding initial loading state...")
                 # First yield IMMEDIATELY: Show loading state (before any logic that might fail)
                 _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
                 yield (
@@ -1548,7 +1588,9 @@ def create_full_interface() -> gr.Blocks:
                     "",  # debug console
                     "⏳ Starting submission evaluation...",  # live debug
                 )
+                logger.info("Initial yield complete")
             except Exception as init_exc:
+                logger.error(f"Initial yield failed: {init_exc}", exc_info=True)
                 # If even the first yield fails, show error
                 err = f"<p style='color:#ef4444;'>❌ Initialization error: {init_exc}</p>"
                 yield (gr.update(), gr.update(), err, "", "", "", submit_count, str(init_exc), str(init_exc))
