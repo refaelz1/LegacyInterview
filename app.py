@@ -4,8 +4,8 @@ app.py — Simplified entry point for hosting platforms (Render, Hugging Face, e
 This file launches the full interface with login page support.
 No API key required — users provide their own via the login page.
 
-IMPORTANT: This is a Gradio application, NOT a WSGI app.
-Do not use gunicorn! Run directly with: python app.py
+For Hugging Face Spaces: demo object is created at module level
+For Render/local: can run with python app.py
 """
 
 import os
@@ -25,35 +25,30 @@ if os.getenv("no_proxy"):
 import gradio as gr
 import student_interface
 
+# Create demo at module level for Hugging Face Spaces
+print("🚀 Initializing Legacy Code Challenge...")
+has_key = bool(os.getenv("OPENAI_API_KEY"))
 
-def main() -> None:
-    """Launch the full interface with auto-detected login page."""
-    
+if has_key:
+    print("✅ API key detected in environment — skipping login page")
+else:
+    print("🔐 No API key found — login page will be shown")
+
+demo = student_interface.create_full_interface()
+print("✅ Interface created successfully!")
+
+# For local/Render deployment
+if __name__ == "__main__":
     port = int(os.getenv("PORT", "7860"))
-    has_key = bool(os.getenv("OPENAI_API_KEY"))
-    
-    print(f"\n🚀 Starting Legacy Code Challenge on port {port}...")
     print(f"📍 Server will listen on 0.0.0.0:{port}")
-    
-    if has_key:
-        print("✅ API key detected in environment — skipping login page")
-    else:
-        print("🔐 No API key found — login page will be shown")
-    
-    demo = student_interface.create_full_interface()
-    
     print(f"🌐 Launching Gradio on 0.0.0.0:{port}...")
     
     demo.launch(
-        server_name="0.0.0.0",  # Listen on all interfaces for hosting
+        server_name="0.0.0.0",
         server_port=port,
-        share=False,  # Render provides its own URL
-        inbrowser=False,  # Don't open browser on server
-        show_error=True,  # Show detailed errors in Render logs
+        share=False,
+        inbrowser=False,
+        show_error=True,
     )
     
     print("✅ Gradio server started successfully!")
-
-
-if __name__ == "__main__":
-    main()
