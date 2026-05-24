@@ -1,5 +1,15 @@
-"""Using Columns but only 2 at a time - linear flow"""
+"""Real Legacy Code Challenge - Working version with Columns"""
 import gradio as gr
+import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Import the real pipeline
+from architect.challenge_deployer import run_pipeline as _run_pipeline
+from challenge import ChallengeState
 
 with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     
@@ -50,15 +60,58 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
         tests_html = gr.HTML("<h3>טסטים</h3>")
         hints_html = gr.HTML("<h3>רמזים</h3>")
     
-    # Event handlers - only 2 outputs each time!
+    # Event handlers
     def on_login(name, api_key):
         if not name or not api_key:
             return gr.update(visible=True), gr.update(visible=False)
+        # Save API key to environment
+        os.environ["OPENAI_API_KEY"] = api_key
+        logger.info(f"User logged in: {name}")
         return gr.update(visible=False), gr.update(visible=True)
     
     def on_start(url, bugs, tests):
-        status = f"מתחיל...\n{url}\nבאגים: {bugs}, טסטים: {tests}"
-        return status, gr.update(visible=False), gr.update(visible=True)
+        logger.info(f"Starting challenge: {url}, bugs={bugs}, tests={tests}")
+        
+        # Show loading
+        yield (
+            "⏳ Cloning repository and generating challenge... this may take 1-2 minutes.",
+            gr.update(visible=True),
+            gr.update(visible=False),
+            gr.update()  # code_display - no change
+        )
+        
+        try:
+            # Run the REAL pipeline!
+            workspace_path = _run_pipeline(
+                url.strip(),
+                nesting_level=2,  # default
+                num_bugs=int(bugs),
+                refactoring_level=0,  # default
+                debug_mode=False
+            )
+            
+            logger.info(f"Pipeline complete! Workspace: {workspace_path}")
+            
+            # Load challenge state
+            cs = ChallengeState(workspace_path)
+            code = cs.read_target()
+            
+            # Move to challenge page
+            yield (
+                f"✅ Challenge ready! File: {cs.target_file}",
+                gr.update(visible=False),
+                gr.update(visible=True),
+                code  # Update code_display
+            )
+            
+        except Exception as exc:
+            logger.error(f"Pipeline failed: {exc}", exc_info=True)
+            yield (
+                f"❌ Error: {exc}",
+                gr.update(visible=True),
+                gr.update(visible=False),
+                ""
+            )
     
     def on_submit():
         # Immediate response - no processing
@@ -81,7 +134,7 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     start_btn.click(
         fn=on_start,
         inputs=[url_input, num_bugs, num_tests],
-        outputs=[status_box, setup_page, challenge_page]
+        outputs=[status_box, setup_page, challenge_page, code_display]
     )
     
     submit_btn.click(
