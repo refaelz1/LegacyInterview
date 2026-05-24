@@ -3,7 +3,7 @@ langgraph
 langchain-core
 gitpython
 python-dotenv
-gradio
+gradio>=6.0.0
 pywebview
 uvicorn[standard]
 gspread
