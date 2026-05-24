@@ -1525,16 +1525,9 @@ def create_full_interface() -> gr.Blocks:
             return cs.sabotaged_code, gr.update(selected=1)
 
         def on_submit(hints_used, submit_count, workspace_path, hint_log, user_name):
-            # Capture all print statements for debug console
-            log_capture = StringIO()
-            original_stdout = sys.stdout
-            
             try:
-                sys.stdout = log_capture
+                # First yield IMMEDIATELY: Show loading state (before any logic that might fail)
                 _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
-                
-                # First yield: Show loading state
-                sys.stdout = original_stdout  # Restore for yield
                 yield (
                     gr.update(visible=False),
                     gr.update(visible=True),
@@ -1543,7 +1536,18 @@ def create_full_interface() -> gr.Blocks:
                     "",  # debug console
                     "⏳ Starting submission evaluation...",  # live debug
                 )
-                sys.stdout = log_capture  # Capture again
+            except Exception as init_exc:
+                # If even the first yield fails, show error
+                err = f"<p style='color:#ef4444;'>❌ Initialization error: {init_exc}</p>"
+                yield (gr.update(), gr.update(), err, "", "", "", submit_count, str(init_exc), str(init_exc))
+                return
+            
+            # Capture all print statements for debug console
+            log_capture = StringIO()
+            original_stdout = sys.stdout
+            
+            try:
+                sys.stdout = log_capture
                 
                 if not workspace_path:
                     sys.stdout = original_stdout
