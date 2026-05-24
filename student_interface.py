@@ -1110,7 +1110,8 @@ def create_full_interface() -> gr.Blocks:
     }
     """
 
-    with gr.Blocks(title="Legacy Code Challenge", css=css) as demo:
+    # Note: CSS parameter moved to launch() in Gradio 6.0, removed for compatibility
+    with gr.Blocks(title="Legacy Code Challenge") as demo:
 
         # Shared state
         user_api_key_state        = gr.State("")
@@ -1742,7 +1743,8 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
     }
     """
 
-    with gr.Blocks(title="Legacy Code Challenge", css=css, js=_make_js(timer_minutes)) as demo:
+    # Note: CSS parameter moved to launch() in Gradio 6.0, removed for compatibility
+    with gr.Blocks(title="Legacy Code Challenge", js=_make_js(timer_minutes)) as demo:
 
         hints_used_state          = gr.State(0)
         submission_count_state    = gr.State(0)
