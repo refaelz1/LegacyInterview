@@ -1308,6 +1308,9 @@ def create_full_interface() -> gr.Blocks:
                     placeholder="Debug logs will appear here during submission...",
                     elem_id="live-debug-console"
                 )
+            
+            # Hidden trigger for submit (ensures at least 1 UI input)
+            submit_trigger = gr.Number(value=0, visible=False)
 
         # ════════════════════════════════════════════════════════════════════
         # PAGE 3 — Results (hidden until Submit clicked)
@@ -1559,9 +1562,9 @@ def create_full_interface() -> gr.Blocks:
             cs.reset_target()
             return cs.sabotaged_code, gr.update(selected=1)
 
-        def on_submit(hints_used, submit_count, workspace_path, hint_log, user_name):
+        def on_submit(trigger, hints_used, submit_count, workspace_path, hint_log, user_name):
             logger.info(f"=== SUBMIT CHALLENGE ===")
-            logger.info(f"User: {user_name}, Hints: {hints_used}, Submit#: {submit_count}")
+            logger.info(f"Trigger: {trigger}, User: {user_name}, Hints: {hints_used}, Submit#: {submit_count}")
             logger.info(f"Workspace: {workspace_path}")
             
             # First yield IMMEDIATELY (like on_start): Show loading WITHOUT changing visibility
@@ -1746,7 +1749,7 @@ def create_full_interface() -> gr.Blocks:
 
         submit_btn.click(
             on_submit,
-            inputs=[hints_used_state, submission_count_state,
+            inputs=[submit_trigger, hints_used_state, submission_count_state,
                     workspace_state, hint_log_state, user_name_state],
             outputs=[
                 challenge_page, results_page,
