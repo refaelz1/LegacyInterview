@@ -55,7 +55,7 @@ def validate_openai_key(api_key: str) -> tuple[bool, str]:
     try:
         os.environ["OPENAI_API_KEY"] = api_key
         from langchain_openai import ChatOpenAI
-        llm = ChatOpenAI(model="gpt-4o", temperature=0, request_timeout=10, max_tokens=5)
+        llm = ChatOpenAI(model="gpt-4o", temperature=0, request_timeout=5, max_tokens=5)
         llm.invoke("test")
         return True, "✅ API key validated!"
     except Exception as e:
@@ -64,6 +64,8 @@ def validate_openai_key(api_key: str) -> tuple[bool, str]:
             return False, "❌ Invalid API key"
         elif "quota" in error.lower():
             return False, "⚠️ API key valid but no quota remaining"
+        elif "timeout" in error.lower():
+            return True, "✅ Key accepted (validation timed out - will verify during use)"
         return True, "✅ Key accepted (couldn't fully verify)"
 
 
@@ -1514,10 +1516,12 @@ def create_full_interface() -> gr.Blocks:
             # Capture all print statements for debug console
             log_capture = StringIO()
             original_stdout = sys.stdout
-            sys.stdout = log_capture
             
             try:
+                sys.stdout = log_capture
                 _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
+                
+                # First yield: Show loading state
                 sys.stdout = original_stdout  # Restore for yield
                 yield (
                     gr.update(visible=False),
