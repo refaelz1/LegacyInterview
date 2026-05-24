@@ -61,18 +61,14 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
         return status, gr.update(visible=False), gr.update(visible=True)
     
     def on_submit():
-        results = """
-        <div style='padding:20px;background:#e8f5e9;border-radius:10px;'>
-            <h2 style='color:green;'>✅ ציון: 85/100</h2>
-        </div>
-        """
-        return (
+        # Immediate response - no processing
+        yield (
             gr.update(visible=False),  # challenge_page
             gr.update(visible=True),   # results_page
-            results,                   # score_html
-            "<p>Diff...</p>",         # diff_html
-            "<p>Tests...</p>",        # tests_html
-            "<p>Hints...</p>"         # hints_html
+            "<div style='padding:20px;background:#e8f5e9;border-radius:10px;'><h2 style='color:green;'>✅ ציון: 85/100</h2></div>",
+            "<p>Diff יופיע כאן...</p>",
+            "<p>Tests יופיעו כאן...</p>",
+            "<p>Hints יופיעו כאן...</p>"
         )
     
     # Wire events
