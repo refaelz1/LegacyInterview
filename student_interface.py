@@ -1525,13 +1525,25 @@ def create_full_interface() -> gr.Blocks:
             return cs.sabotaged_code, gr.update(selected=1)
 
         def on_submit(hints_used, submit_count, workspace_path, hint_log, user_name):
+            # ULTRA-SIMPLE TEST: Just show SOMETHING immediately
+            test_msg = f"""
+            <div style='padding:20px;background:#1e1e1e;color:#fff;border-radius:8px;'>
+                <h3>🔍 Debug Info</h3>
+                <p><strong>Function called:</strong> YES</p>
+                <p><strong>hints_used:</strong> {hints_used}</p>
+                <p><strong>submit_count:</strong> {submit_count}</p>
+                <p><strong>workspace_path:</strong> {workspace_path}</p>
+                <p><strong>user_name:</strong> {user_name}</p>
+            </div>
+            """
+            
             try:
                 # First yield IMMEDIATELY: Show loading state (before any logic that might fail)
                 _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
                 yield (
                     gr.update(visible=False),
                     gr.update(visible=True),
-                    _loading, "", "", "",
+                    test_msg, "", "", "",  # Show debug info instead of loading
                     submit_count,
                     "",  # debug console
                     "⏳ Starting submission evaluation...",  # live debug
