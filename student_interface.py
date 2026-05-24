@@ -1563,22 +1563,122 @@ def create_full_interface() -> gr.Blocks:
             return cs.sabotaged_code, gr.update(selected=1)
 
         def on_submit(trigger, hints_used, submit_count, workspace_path, hint_log, user_name):
-            """SIMPLIFIED VERSION: Just change page visibility - no logic yet"""
-            logger.info(f"=== SUBMIT (SIMPLE TEST) ===")
-            logger.info(f"User: {user_name}, Submit#: {submit_count}")
+            logger.info(f"=== SUBMIT CHALLENGE ===")
+            logger.info(f"Trigger: {trigger}, User: {user_name}, Hints: {hints_used}, Submit#: {submit_count}")
+            logger.info(f"Workspace: {workspace_path}")
             
-            # Simple return - just change page visibility
-            return (
-                gr.update(visible=False),  # Hide challenge_page
-                gr.update(visible=True),   # Show results_page
-                "<h1 style='text-align:center;color:green;'>✅ עמוד התוצאות!</h1><p>אם אתה רואה את זה, המעבר עובד.</p>",
-                "<p>Diff will be here...</p>",
-                "<p>Tests will be here...</p>",
-                "<p>Hints will be here...</p>",
-                submit_count + 1,
-                "Debug console",
-                "Live debug",
+            # STEP 1: Change page visibility IMMEDIATELY (like on_login - simple update)
+            yield (
+                gr.update(visible=False),  # challenge_page
+                gr.update(visible=True),   # results_page  
+                "",  # score_html - empty for now
+                "",  # changes_html
+                "",  # test_html
+                "",  # hints_html
+                submit_count,  # no change yet
+                "",  # debug console
+                "Starting submission evaluation...",  # live debug
             )
+            
+            # STEP 2: Show loading message
+            _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
+            yield (
+                gr.update(),  # challenge_page - already hidden
+                gr.update(),  # results_page - already visible
+                _loading,  # score_html
+                "",  # changes_html
+                "",  # test_html
+                "",  # hints_html
+                submit_count,
+                "",  # debug console
+                "Evaluating code...",  # live debug
+            )
+            
+            # Capture all print statements for debug console
+            log_capture = StringIO()
+            original_stdout = sys.stdout
+            
+            try:
+                sys.stdout = log_capture
+                
+                if not workspace_path:
+                    sys.stdout = original_stdout
+                    yield (
+                        gr.update(),  # challenge_page
+                        gr.update(),  # results_page
+                        "No challenge loaded.", "", "", "",
+                        submit_count,
+                        log_capture.getvalue(),
+                        "❌ No workspace loaded"
+                    )
+                    return
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Starting submission evaluation...")
+                cs  = ChallengeState(workspace_path)
+                log = SubmissionLog(cs.workspace)
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 📖 Reading submitted code...")
+                submitted_code = cs.read_target()
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 🧪 Running tests...")
+                result = evaluate_submission(
+                    workspace_path=workspace_path,
+                    student_code=submitted_code,
+                    original_code=cs.original_code,
+                    bug_func_name=cs.bug_func_name,
+                    hints_used=hints_used,
+                    sabotaged_code=cs.sabotaged_code,
+                    target_file=str(cs.target_path),
+                    bug_func_names=cs.bug_func_names,
+                )
+                
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 💾 Saving submission...")
+                log.save(submitted_code, result, hints_used)
+                new_count = submit_count + 1
+
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 📊 Generating results...")
+                score_html     = _score_summary_html(result)
+                combined_diff  = _combined_changes_html(cs, submitted_code)
+                test_html      = _colorise_test_output(result["test_output"] or "No test output.")
+                hints_html     = _hints_html(hint_log or [])
+
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ Results ready, returning to user...")
+                
+                # Get all captured logs
+                debug_logs = log_capture.getvalue()
+                sys.stdout = original_stdout  # Restore stdout
+                
+                # STEP 3: Return final results
+                yield (
+                    gr.update(),  # challenge_page - no change
+                    gr.update(),  # results_page - no change
+                    score_html,
+                    combined_diff,
+                    test_html,
+                    hints_html,
+                    new_count,
+                    debug_logs,
+                    debug_logs,  # live debug
+                )
+                
+                logger.info("Final yield complete!")
+                
+            except Exception as exc:
+                import traceback
+                error_details = traceback.format_exc()
+                debug_logs = log_capture.getvalue() + f"\n\n❌ ERROR:\n{error_details}"
+                sys.stdout = original_stdout  # Restore stdout
+                err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
+                yield (
+                    gr.update(),  # challenge_page
+                    gr.update(),  # results_page
+                    err, "", "", "",
+                    submit_count,
+                    debug_logs,
+                    debug_logs
+                )
+            finally:
+                sys.stdout = original_stdout  # Always restore stdout
 
         def on_send(message, history, hints_used, submit_count, workspace_path, hint_log, confirmation_pending):
             if not message.strip():
