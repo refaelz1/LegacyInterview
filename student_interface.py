@@ -73,7 +73,7 @@ def validate_openai_key(api_key: str) -> tuple[bool, str]:
         logger.info("Making test call to OpenAI...")
         llm = ChatOpenAI(model="gpt-4o", temperature=0, request_timeout=5, max_tokens=5)
         llm.invoke("test")
-        logger.info("✅ API key validated successfully")
+        logger.info("API key validated successfully")
         return True, "✅ API key validated!"
     except Exception as e:
         error = str(e)
@@ -1564,18 +1564,6 @@ def create_full_interface() -> gr.Blocks:
             logger.info(f"User: {user_name}, Hints: {hints_used}, Submit#: {submit_count}")
             logger.info(f"Workspace: {workspace_path}")
             
-            # ULTRA-SIMPLE TEST: Just show SOMETHING immediately
-            test_msg = f"""
-            <div style='padding:20px;background:#1e1e1e;color:#fff;border-radius:8px;'>
-                <h3>🔍 Debug Info</h3>
-                <p><strong>Function called:</strong> YES</p>
-                <p><strong>hints_used:</strong> {hints_used}</p>
-                <p><strong>submit_count:</strong> {submit_count}</p>
-                <p><strong>workspace_path:</strong> {workspace_path}</p>
-                <p><strong>user_name:</strong> {user_name}</p>
-            </div>
-            """
-            
             try:
                 logger.info("Yielding initial loading state...")
                 # First yield IMMEDIATELY: Show loading state (before any logic that might fail)
@@ -1583,10 +1571,10 @@ def create_full_interface() -> gr.Blocks:
                 yield (
                     gr.update(visible=False),
                     gr.update(visible=True),
-                    test_msg, "", "", "",  # Show debug info instead of loading
+                    _loading, "", "", "",  # Show loading message
                     submit_count,
                     "",  # debug console
-                    "⏳ Starting submission evaluation...",  # live debug
+                    "Starting submission evaluation...",  # live debug
                 )
                 logger.info("Initial yield complete")
             except Exception as init_exc:
