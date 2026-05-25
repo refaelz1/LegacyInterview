@@ -1278,6 +1278,30 @@ def create_full_interface() -> gr.Blocks:
                                 refresh_btn = gr.Button("🔄 Refresh", variant="secondary")
                                 revert_btn  = gr.Button("↩️ Revert to Original", variant="secondary")
                             changes_diff_html = gr.HTML("")
+                        
+                        # ── Results Tab (shown after Submit) ──────────────────
+                        with gr.Tab("📊 Results", id=4):
+                            score_summary_html = gr.HTML("")
+
+                            with gr.Tabs():
+                                with gr.Tab("🧪 Test Results"):
+                                    results_test_html = gr.HTML("")
+
+                                with gr.Tab("🔍 Changes & Expected"):
+                                    results_changes_html = gr.HTML("")
+
+                                with gr.Tab("💡 Hints Used"):
+                                    results_hints_html = gr.HTML("")
+                            
+                            # Debug console (collapsible)
+                            with gr.Accordion("🐛 Debug Console", open=False):
+                                debug_console = gr.Textbox(
+                                    label="Execution Logs",
+                                    lines=15,
+                                    max_lines=30,
+                                    interactive=False,
+                                    placeholder="Debug logs will appear here...",
+                                )
 
                 # ── Right column: AI assistant + submit ───────────────────
                 with gr.Column(scale=2, elem_classes=["right-col"]):
@@ -1311,34 +1335,6 @@ def create_full_interface() -> gr.Blocks:
             
             # Hidden trigger for submit (ensures at least 1 UI input)
             submit_trigger = gr.Number(value=0, visible=False)
-
-        # ════════════════════════════════════════════════════════════════════
-        # PAGE 3 — Results (hidden until Submit clicked)
-        # ════════════════════════════════════════════════════════════════════
-        with gr.Column(visible=False) as results_page:
-            gr.Markdown("## 📊 Submission Results")
-
-            score_summary_html = gr.HTML("")
-
-            with gr.Tabs():
-                with gr.Tab("🧪 Test Results"):
-                    results_test_html = gr.HTML("")
-
-                with gr.Tab("🔍 Changes & Expected"):
-                    results_changes_html = gr.HTML("")
-
-                with gr.Tab("💡 Hints Used"):
-                    results_hints_html = gr.HTML("")
-            
-            # Debug console (collapsible)
-            with gr.Accordion("🐛 Debug Console", open=False):
-                debug_console = gr.Textbox(
-                    label="Execution Logs",
-                    lines=15,
-                    max_lines=30,
-                    interactive=False,
-                    placeholder="Debug logs will appear here...",
-                )
 
         # ── Login callback ────────────────────────────────────────────────
         
@@ -1381,7 +1377,6 @@ def create_full_interface() -> gr.Blocks:
                 gr.update(visible=True),   # show login
                 gr.update(visible=False),  # hide setup
                 gr.update(visible=False),  # hide challenge
-                gr.update(visible=False),  # hide results
                 gr.update(visible=False),  # hide logout
                 "", "", "", "",  # clear textboxes
                 "", ""  # clear states
@@ -1487,7 +1482,7 @@ def create_full_interface() -> gr.Blocks:
         logout_btn.click(
             on_logout,
             outputs=[
-                login_page, setup_page, challenge_page, results_page, logout_btn,
+                login_page, setup_page, challenge_page, logout_btn,
                 login_name, login_api_key, name_box, url_box,
                 user_api_key_state, user_name_state
             ]
@@ -1567,11 +1562,10 @@ def create_full_interface() -> gr.Blocks:
             logger.info(f"Trigger: {trigger}, User: {user_name}, Hints: {hints_used}, Submit#: {submit_count}")
             logger.info(f"Workspace: {workspace_path}")
             
-            # First yield IMMEDIATELY (like on_start): Show loading WITHOUT changing visibility
+            # First yield IMMEDIATELY: Show loading in Results tab
             _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
             yield (
-                gr.update(),  # challenge_page - no change yet
-                gr.update(),  # results_page - no change yet
+                gr.Tabs(selected=4),  # Switch to Results tab
                 _loading, "", "", "",  # Show loading message in results area
                 submit_count,
                 "",  # debug console
@@ -1587,7 +1581,7 @@ def create_full_interface() -> gr.Blocks:
                 
                 if not workspace_path:
                     sys.stdout = original_stdout
-                    yield (gr.update(visible=False), gr.update(visible=True), "No challenge loaded.", "", "", "", submit_count, log_capture.getvalue(), "❌ No workspace loaded")
+                    yield (gr.Tabs(selected=4), "No challenge loaded.", "", "", "", submit_count, log_capture.getvalue(), "❌ No workspace loaded")
                     return
                 
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Starting submission evaluation...")
@@ -1627,7 +1621,7 @@ def create_full_interface() -> gr.Blocks:
                 
                 # Return results to user IMMEDIATELY
                 yield (
-                    gr.update(visible=False), gr.update(visible=True),
+                    gr.Tabs(selected=4),  # Stay on Results tab
                     score_html, combined_diff, test_html, hints_html,
                     new_count,
                     debug_logs,
@@ -1690,7 +1684,7 @@ def create_full_interface() -> gr.Blocks:
                 debug_logs = log_capture.getvalue() + f"\n\n❌ ERROR:\n{error_details}"
                 sys.stdout = original_stdout  # Restore stdout
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
-                yield (gr.update(visible=False), gr.update(visible=True), err, "", "", "", submit_count, debug_logs, debug_logs)
+                yield (gr.Tabs(selected=4), err, "", "", "", submit_count, debug_logs, debug_logs)
             finally:
                 sys.stdout = original_stdout  # Always restore stdout
 
@@ -1752,7 +1746,7 @@ def create_full_interface() -> gr.Blocks:
             inputs=[submit_trigger, hints_used_state, submission_count_state,
                     workspace_state, hint_log_state, user_name_state],
             outputs=[
-                challenge_page, results_page,
+                left_tabs,  # Switch to Results tab
                 score_summary_html,
                 results_changes_html,
                 results_test_html,
