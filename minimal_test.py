@@ -203,6 +203,7 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
                 debug_check = gr.Checkbox(label="🐞 Debug Mode", value=False)
             start_btn = gr.Button("Start Challenge ➡️", variant="primary", size="lg")
             status_md = gr.Markdown("")
+            go_to_challenge_btn = gr.Button("📋 Go to Challenge →", variant="primary", size="lg", visible=False)
         
         # Tab 2: Challenge
         with gr.Tab("💻 Challenge", id=2):
@@ -263,7 +264,7 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
         # Ensure API key is set
         if not api_key:
             logger.warning("No API key provided!")
-            yield gr.Tabs(selected=1), "❌ No API key! Please login again.", "", "", ""
+            yield gr.Tabs(selected=1), "❌ No API key! Please login again.", "", "", "", gr.Button(visible=False)
             return
             
         if api_key:
@@ -271,7 +272,7 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
             logger.info(f"Using API key: {api_key[:10]}...")
         
         logger.info(f"Starting: {url}, bugs={bugs}, nesting={nesting}, refactoring={refactoring}, debug={debug}")
-        yield gr.Tabs(selected=1), "⏳ Creating challenge... (this may take 1-2 minutes)", "", "", ""
+        yield gr.Tabs(selected=1), "⏳ Creating challenge... (this may take 1-2 minutes)", "", "", "", gr.Button(visible=False)
         
         try:
             logger.info("Running pipeline...")
@@ -289,8 +290,15 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
             readme = cs.readme()
             logger.info(f"Loading challenge from {cs.target_file}")
             
-            yield gr.Tabs(selected=2), f"✅ Ready! File: {cs.target_file}", readme, code, workspace
-            logger.info("Successfully moved to Challenge tab!")
+            # Don't change tab automatically - show button instead
+            success_msg = f"""✅ **Challenge Ready!** 
+
+**File:** `{cs.target_file}`
+
+Click the button below to start solving the challenge! 👇"""
+            
+            yield gr.Tabs(selected=1), success_msg, readme, code, workspace, gr.Button("📋 Go to Challenge →", visible=True, variant="primary", size="lg")
+            logger.info("Challenge ready - waiting for user to click button")
         except Exception as exc:
             logger.error(f"Pipeline failed: {exc}", exc_info=True)
             error_msg = str(exc)
@@ -320,7 +328,12 @@ Could not clone the repository.
             else:
                 error_msg = f"❌ **Error creating challenge:**\n\n{exc}"
             
-            yield gr.Tabs(selected=1), error_msg, "", "", ""
+            yield gr.Tabs(selected=1), error_msg, "", "", "", gr.Button(visible=False)
+    
+    def go_to_challenge():
+        """Simple function to switch to Challenge tab."""
+        logger.info("User clicked Go to Challenge button")
+        return gr.Tabs(selected=2)
     
     def on_submit(workspace, code, hints_used, submit_count):
         logger.info(f"Submit clicked (hints={hints_used}, attempt={submit_count+1})")
@@ -492,7 +505,8 @@ Could not clone the repository.
     # ── Wire events ───────────────────────────────────────────────────────────────
     
     login_btn.click(on_login, inputs=[name_input, api_input], outputs=[tabs, user_api_key_state, login_status])
-    start_btn.click(on_start, inputs=[url_input, num_bugs, nesting_slider, refactoring_check, debug_check, user_api_key_state], outputs=[tabs, status_md, readme_md, code_box, workspace_state])
+    start_btn.click(on_start, inputs=[url_input, num_bugs, nesting_slider, refactoring_check, debug_check, user_api_key_state], outputs=[tabs, status_md, readme_md, code_box, workspace_state, go_to_challenge_btn])
+    go_to_challenge_btn.click(go_to_challenge, inputs=[], outputs=[tabs])
     
     # Code Editor Tools
     run_tests_btn.click(on_run_tests, inputs=[code_box, workspace_state], outputs=[test_output_box])
