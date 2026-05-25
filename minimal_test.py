@@ -174,6 +174,7 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     
     # Hidden state
     workspace_state = gr.State("")
+    user_api_key_state = gr.State("")  # Store user's API key
     
     with gr.Tabs() as tabs:
         # Tab 0: Login
@@ -181,6 +182,7 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
             gr.Markdown("# 🔐 Welcome to Legacy Code Challenge")
             name_input = gr.Textbox(label="Your Name", placeholder="e.g. Alice")
             api_input = gr.Textbox(label="OpenAI API Key", placeholder="sk-proj-...", type="password")
+            login_status = gr.Markdown("")
             login_btn = gr.Button("Continue ➡️", variant="primary", size="lg")
         
         # Tab 1: Setup
@@ -244,12 +246,25 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     # Event handlers
     def on_login(name, api_key):
         if not name or not api_key:
-            return gr.Tabs(selected=0)
+            return gr.Tabs(selected=0), "", "⚠️ Please enter both name and API key"
+        
+        # Validate API key format
+        api_key = api_key.strip()
+        if not api_key.startswith("sk-"):
+            logger.warning(f"Invalid API key format from {name}")
+            return gr.Tabs(selected=0), "", "❌ Invalid API key format. Must start with 'sk-'"
+        
+        # Store in both os.environ and State
         os.environ["OPENAI_API_KEY"] = api_key
-        logger.info(f"User logged in: {name}")
-        return gr.Tabs(selected=1)
+        logger.info(f"User logged in: {name} (API key: {api_key[:10]}...)")
+        return gr.Tabs(selected=1), api_key, "✅ Logged in!"
     
-    def on_start(url, bugs, nesting, refactoring, debug):
+    def on_start(url, bugs, nesting, refactoring, debug, api_key):
+        # Ensure API key is set
+        if api_key:
+            os.environ["OPENAI_API_KEY"] = api_key
+            logger.info(f"Using API key: {api_key[:10]}...")
+        
         logger.info(f"Starting: {url}, bugs={bugs}, nesting={nesting}, refactoring={refactoring}, debug={debug}")
         yield gr.Tabs(selected=1), "⏳ Creating challenge...", "", "", ""
         
@@ -465,8 +480,8 @@ Could not clone the repository.
     
     # ── Wire events ───────────────────────────────────────────────────────────────
     
-    login_btn.click(on_login, inputs=[name_input, api_input], outputs=[tabs])
-    start_btn.click(on_start, inputs=[url_input, num_bugs, nesting_slider, refactoring_check, debug_check], outputs=[tabs, status_md, readme_md, code_box, workspace_state])
+    login_btn.click(on_login, inputs=[name_input, api_input], outputs=[tabs, user_api_key_state, login_status])
+    start_btn.click(on_start, inputs=[url_input, num_bugs, nesting_slider, refactoring_check, debug_check, user_api_key_state], outputs=[tabs, status_md, readme_md, code_box, workspace_state])
     
     # Code Editor Tools
     run_tests_btn.click(on_run_tests, inputs=[code_box, workspace_state], outputs=[test_output_box])
