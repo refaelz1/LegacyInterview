@@ -1302,6 +1302,10 @@ def create_full_interface() -> gr.Blocks:
                                     interactive=False,
                                     placeholder="Debug logs will appear here...",
                                 )
+                        
+                        # ── Simple Test Tab (for debugging navigation) ────────
+                        with gr.Tab("🧪 Test Page", id=5):
+                            test_page_content = gr.Markdown("# ✅ זה עובד!\n\nזה עמוד פשוט לבדיקה, ללא שום לוגיקה.")
 
                 # ── Right column: AI assistant + submit ───────────────────
                 with gr.Column(scale=2, elem_classes=["right-col"]):
@@ -1321,7 +1325,7 @@ def create_full_interface() -> gr.Blocks:
                     gr.Markdown("---")
                     with gr.Row():
                         submit_btn = gr.Button("🚀 Submit Fix", variant="primary", scale=3)
-                        test_results_btn = gr.Button("🧪 Test Results Tab", variant="secondary", scale=2)
+                        test_results_btn = gr.Button("🧪 Test Page", variant="secondary", scale=2)
             
             # Live Debug Console (always visible at bottom)
             gr.Markdown("---")
@@ -1385,14 +1389,8 @@ def create_full_interface() -> gr.Blocks:
             )
         
         def test_results_navigation():
-            """Test function to switch to Results tab with minimal content."""
-            return (
-                gr.update(selected=4),  # Switch to Results tab
-                "<h2>✅ Test Successful!</h2><p>Results tab navigation works!</p>",
-                "<p>This is a test of the Changes section.</p>",
-                "<p>This is a test of the Test Results section.</p>",
-                "<p>This is a test of the Hints section.</p>",
-            )
+            """Test function to switch to simple Test Page tab."""
+            return gr.update(selected=5)  # Switch to Test Page tab (id=5)
 
         # ── Setup callback ─────────────────────────────────────────────────
 
@@ -1769,16 +1767,10 @@ def create_full_interface() -> gr.Blocks:
             ],
         )
         
-        # Test button to navigate to Results tab with minimal content
+        # Test button to navigate to simple Test Page tab
         test_results_btn.click(
             test_results_navigation,
-            outputs=[
-                left_tabs,
-                score_summary_html,
-                results_changes_html,
-                results_test_html,
-                results_hints_html,
-            ],
+            outputs=left_tabs,
         )
         
         send_btn.click(
