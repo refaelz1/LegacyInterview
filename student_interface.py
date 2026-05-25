@@ -2122,3 +2122,9 @@ def create_interface(workspace_path: str, student_name: str = "", timer_minutes:
     demo.queue(max_size=20, default_concurrency_limit=10)
     
     return demo
+
+# Create the demo instance for app.py to import
+demo = create_full_interface()
+
+if __name__ == "__main__":
+    demo.launch()
