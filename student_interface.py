@@ -1319,7 +1319,9 @@ def create_full_interface() -> gr.Blocks:
                         send_btn = gr.Button("Send", variant="secondary", scale=1)
 
                     gr.Markdown("---")
-                    submit_btn = gr.Button("🚀 Submit Fix", variant="primary")
+                    with gr.Row():
+                        submit_btn = gr.Button("🚀 Submit Fix", variant="primary", scale=3)
+                        test_results_btn = gr.Button("🧪 Test Results Tab", variant="secondary", scale=2)
             
             # Live Debug Console (always visible at bottom)
             gr.Markdown("---")
@@ -1380,6 +1382,16 @@ def create_full_interface() -> gr.Blocks:
                 gr.update(visible=False),  # hide logout
                 "", "", "", "",  # clear textboxes
                 "", ""  # clear states
+            )
+        
+        def test_results_navigation():
+            """Test function to switch to Results tab with minimal content."""
+            return (
+                gr.update(selected=4),  # Switch to Results tab
+                "<h2>✅ Test Successful!</h2><p>Results tab navigation works!</p>",
+                "<p>This is a test of the Changes section.</p>",
+                "<p>This is a test of the Test Results section.</p>",
+                "<p>This is a test of the Hints section.</p>",
             )
 
         # ── Setup callback ─────────────────────────────────────────────────
@@ -1756,6 +1768,19 @@ def create_full_interface() -> gr.Blocks:
                 live_debug_console,
             ],
         )
+        
+        # Test button to navigate to Results tab with minimal content
+        test_results_btn.click(
+            test_results_navigation,
+            outputs=[
+                left_tabs,
+                score_summary_html,
+                results_changes_html,
+                results_test_html,
+                results_hints_html,
+            ],
+        )
+        
         send_btn.click(
             on_send,
             inputs=[chat_input, chatbot, hints_used_state, submission_count_state, workspace_state, hint_log_state, confirmation_pending_state],
