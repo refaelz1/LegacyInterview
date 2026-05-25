@@ -261,14 +261,20 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
     
     def on_start(url, bugs, nesting, refactoring, debug, api_key):
         # Ensure API key is set
+        if not api_key:
+            logger.warning("No API key provided!")
+            yield gr.Tabs(selected=1), "❌ No API key! Please login again.", "", "", ""
+            return
+            
         if api_key:
             os.environ["OPENAI_API_KEY"] = api_key
             logger.info(f"Using API key: {api_key[:10]}...")
         
         logger.info(f"Starting: {url}, bugs={bugs}, nesting={nesting}, refactoring={refactoring}, debug={debug}")
-        yield gr.Tabs(selected=1), "⏳ Creating challenge...", "", "", ""
+        yield gr.Tabs(selected=1), "⏳ Creating challenge... (this may take 1-2 minutes)", "", "", ""
         
         try:
+            logger.info("Running pipeline...")
             workspace = _run_pipeline(
                 url.strip(), 
                 nesting_level=int(nesting), 
@@ -276,10 +282,15 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
                 refactoring_enabled=refactoring,
                 debug_mode=debug
             )
+            logger.info(f"Pipeline completed! Workspace: {workspace}")
+            
             cs = ChallengeState(workspace)
             code = cs.read_target()
             readme = cs.readme()
+            logger.info(f"Loading challenge from {cs.target_file}")
+            
             yield gr.Tabs(selected=2), f"✅ Ready! File: {cs.target_file}", readme, code, workspace
+            logger.info("Successfully moved to Challenge tab!")
         except Exception as exc:
             logger.error(f"Pipeline failed: {exc}", exc_info=True)
             error_msg = str(exc)
