@@ -1280,7 +1280,7 @@ def create_full_interface() -> gr.Blocks:
                             changes_diff_html = gr.HTML("")
                         
                         # ── Results Tab (shown after Submit) ──────────────────
-                        with gr.Tab("📊 Results", id=4, visible=False) as results_tab:
+                        with gr.Tab("📊 Results", id=4):
                             score_summary_html = gr.HTML("")
 
                             with gr.Tabs():
@@ -1566,7 +1566,6 @@ def create_full_interface() -> gr.Blocks:
             _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
             yield (
                 gr.update(selected=4),  # Switch to Results tab
-                gr.update(visible=True),  # Show Results tab
                 _loading, "", "", "",  # Show loading message in results area
                 submit_count,
                 "",  # debug console
@@ -1582,7 +1581,7 @@ def create_full_interface() -> gr.Blocks:
                 
                 if not workspace_path:
                     sys.stdout = original_stdout
-                    yield (gr.update(selected=4), gr.update(visible=True), "No challenge loaded.", "", "", "", submit_count, log_capture.getvalue(), "❌ No workspace loaded")
+                    yield (gr.update(selected=4), "No challenge loaded.", "", "", "", submit_count, log_capture.getvalue(), "❌ No workspace loaded")
                     return
                 
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Starting submission evaluation...")
@@ -1623,7 +1622,6 @@ def create_full_interface() -> gr.Blocks:
                 # Return results to user IMMEDIATELY
                 yield (
                     gr.update(selected=4),  # Stay on Results tab
-                    gr.update(visible=True),  # Ensure Results tab is visible
                     score_html, combined_diff, test_html, hints_html,
                     new_count,
                     debug_logs,
@@ -1686,7 +1684,7 @@ def create_full_interface() -> gr.Blocks:
                 debug_logs = log_capture.getvalue() + f"\n\n❌ ERROR:\n{error_details}"
                 sys.stdout = original_stdout  # Restore stdout
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
-                yield (gr.update(selected=4), gr.update(visible=True), err, "", "", "", submit_count, debug_logs, debug_logs)
+                yield (gr.update(selected=4), err, "", "", "", submit_count, debug_logs, debug_logs)
             finally:
                 sys.stdout = original_stdout  # Always restore stdout
 
@@ -1749,7 +1747,6 @@ def create_full_interface() -> gr.Blocks:
                     workspace_state, hint_log_state, user_name_state],
             outputs=[
                 left_tabs,  # Switch to Results tab
-                results_tab,  # Make Results tab visible
                 score_summary_html,
                 results_changes_html,
                 results_test_html,
