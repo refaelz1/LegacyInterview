@@ -186,6 +186,12 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
         # Tab 1: Setup
         with gr.Tab("⚙️ Setup", id=1):
             gr.Markdown("# ⚙️ Setup Challenge")
+            gr.Markdown("""
+            **Recommended repositories:**
+            - `https://github.com/mahmoud/boltons` (utilities library - works great!)
+            - `https://github.com/psf/requests` (HTTP library)
+            - `https://github.com/pallets/flask` (web framework)
+            """)
             url_input = gr.Textbox(label="GitHub URL", value="https://github.com/mahmoud/boltons")
             with gr.Row():
                 num_bugs = gr.Slider(1, 5, value=3, step=1, label="Number of Bugs")
@@ -261,7 +267,34 @@ with gr.Blocks(title="Legacy Code Challenge", theme=gr.themes.Soft()) as demo:
             yield gr.Tabs(selected=2), f"✅ Ready! File: {cs.target_file}", readme, code, workspace
         except Exception as exc:
             logger.error(f"Pipeline failed: {exc}", exc_info=True)
-            yield gr.Tabs(selected=1), f"❌ Error: {exc}", "", "", ""
+            error_msg = str(exc)
+            
+            # Provide helpful error messages
+            if "not found in source" in error_msg:
+                error_msg = f"""❌ **Function not found in repository**
+                
+The system couldn't find a suitable function to create a challenge.
+
+**Possible solutions:**
+1. Try a different repository (one with Python code)
+2. Lower the **Nesting Level** slider (try 1 or 2)
+3. Use a well-known repo like: `https://github.com/mahmoud/boltons`
+
+**Technical details:** {exc}"""
+            elif "git" in error_msg.lower() or "clone" in error_msg.lower():
+                error_msg = f"""❌ **Repository access failed**
+
+Could not clone the repository.
+
+**Check:**
+- URL is correct and public
+- Repository contains Python code
+
+**Error:** {exc}"""
+            else:
+                error_msg = f"❌ **Error creating challenge:**\n\n{exc}"
+            
+            yield gr.Tabs(selected=1), error_msg, "", "", ""
     
     def on_submit(workspace, code, hints_used, submit_count):
         logger.info(f"Submit clicked (hints={hints_used}, attempt={submit_count+1})")
