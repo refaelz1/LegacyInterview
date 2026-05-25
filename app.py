@@ -31,9 +31,9 @@ if os.getenv("https_proxy"):
 if os.getenv("no_proxy"):
     os.environ["no_proxy"] = os.getenv("no_proxy")
 
-logger.info("🚀 Launching Legacy Code Challenge (Tabs version)...")
+logger.info("🚀 Launching Legacy Code Challenge (Full featured Tabs version)...")
 
-from minimal_test import demo
+from student_interface_tabs import demo
 
 logger.info("✅ Demo imported successfully!")
 
