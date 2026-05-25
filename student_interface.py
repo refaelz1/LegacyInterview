@@ -1306,6 +1306,9 @@ def create_full_interface() -> gr.Blocks:
                         # ── Simple Test Tab (for debugging navigation) ────────
                         with gr.Tab("🧪 Test Page", id=5):
                             test_page_content = gr.Markdown("# ✅ זה עובד!\n\nזה עמוד פשוט לבדיקה, ללא שום לוגיקה.")
+                            
+                            # Testing: Start with just score_summary_html from Results
+                            test_score_html = gr.HTML("", label="Test Score")
 
                 # ── Right column: AI assistant + submit ───────────────────
                 with gr.Column(scale=2, elem_classes=["right-col"]):
@@ -1392,9 +1395,19 @@ def create_full_interface() -> gr.Blocks:
             """Test function to verify button works by updating visible content."""
             logger.info("🧪 Test button clicked - updating UI")
             print("🧪 Test button clicked!")
+            
+            # Create a simple HTML score summary (like in Results)
+            test_html = """
+            <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 15px; text-align: center; color: white; margin: 20px 0;'>
+                <h2 style='margin: 0; font-size: 2.5em;'>🧪 TEST SCORE</h2>
+                <p style='font-size: 1.2em; margin: 10px 0;'>This is a test HTML component</p>
+            </div>
+            """
+            
             return (
-                gr.update(selected=5),  # Try to switch tab
-                "# 🧪 הכפתור עובד!\n\nאם אתה רואה את זה, הכפתור עובד!"  # Update challenge readme
+                gr.update(selected=5),  # Switch to Test Page tab
+                "# 🧪 הכפתור עובד!\n\nעכשיו בודקים את חלק ה-HTML של התוצאות...",  # Update challenge readme
+                test_html,  # Test score HTML
             )
 
         # ── Setup callback ─────────────────────────────────────────────────
@@ -1776,7 +1789,7 @@ def create_full_interface() -> gr.Blocks:
         test_results_btn.click(
             test_results_navigation,
             inputs=[],
-            outputs=[left_tabs, challenge_readme],
+            outputs=[left_tabs, challenge_readme, test_score_html],
         )
         
         send_btn.click(
