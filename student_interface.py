@@ -1567,31 +1567,15 @@ def create_full_interface() -> gr.Blocks:
             logger.info(f"Trigger: {trigger}, User: {user_name}, Hints: {hints_used}, Submit#: {submit_count}")
             logger.info(f"Workspace: {workspace_path}")
             
-            # STEP 1: Change page visibility IMMEDIATELY (like on_login - simple update)
-            yield (
-                gr.update(visible=False),  # challenge_page
-                gr.update(visible=True),   # results_page  
-                "",  # score_html - empty for now
-                "",  # changes_html
-                "",  # test_html
-                "",  # hints_html
-                submit_count,  # no change yet
-                "",  # debug console
-                "Starting submission evaluation...",  # live debug
-            )
-            
-            # STEP 2: Show loading message
+            # First yield IMMEDIATELY (like on_start): Show loading WITHOUT changing visibility
             _loading = '<p style="text-align:center;padding:40px;color:#888;font-size:1.2em;">⏳ Running tests…</p>'
             yield (
-                gr.update(),  # challenge_page - already hidden
-                gr.update(),  # results_page - already visible
-                _loading,  # score_html
-                "",  # changes_html
-                "",  # test_html
-                "",  # hints_html
+                gr.update(),  # challenge_page - no change yet
+                gr.update(),  # results_page - no change yet
+                _loading, "", "", "",  # Show loading message in results area
                 submit_count,
                 "",  # debug console
-                "Evaluating code...",  # live debug
+                "Starting submission evaluation...",  # live debug
             )
             
             # Capture all print statements for debug console
@@ -1603,14 +1587,7 @@ def create_full_interface() -> gr.Blocks:
                 
                 if not workspace_path:
                     sys.stdout = original_stdout
-                    yield (
-                        gr.update(),  # challenge_page
-                        gr.update(),  # results_page
-                        "No challenge loaded.", "", "", "",
-                        submit_count,
-                        log_capture.getvalue(),
-                        "❌ No workspace loaded"
-                    )
+                    yield (gr.update(visible=False), gr.update(visible=True), "No challenge loaded.", "", "", "", submit_count, log_capture.getvalue(), "❌ No workspace loaded")
                     return
                 
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Starting submission evaluation...")
@@ -1648,35 +1625,72 @@ def create_full_interface() -> gr.Blocks:
                 debug_logs = log_capture.getvalue()
                 sys.stdout = original_stdout  # Restore stdout
                 
-                # STEP 3: Return final results
+                # Return results to user IMMEDIATELY
                 yield (
-                    gr.update(),  # challenge_page - no change
-                    gr.update(),  # results_page - no change
-                    score_html,
-                    combined_diff,
-                    test_html,
-                    hints_html,
+                    gr.update(visible=False), gr.update(visible=True),
+                    score_html, combined_diff, test_html, hints_html,
                     new_count,
                     debug_logs,
-                    debug_logs,  # live debug
+                    debug_logs,  # live debug (same)
                 )
                 
-                logger.info("Final yield complete!")
+                # Upload to cloud services in BACKGROUND THREAD (non-blocking)
+                # TEMPORARILY DISABLED - Testing without cloud uploads
+                """
+                def _background_upload():
+                    student_name = user_name.strip() if user_name else "Anonymous"
+                    
+                    # Google Sheets (fast summary)
+                    if GOOGLE_SHEETS_AVAILABLE:
+                        try:
+                            print("📊 Uploading to Google Sheets...")
+                            log_to_google_sheets(
+                                student_name=student_name,
+                                repo_url=cs.github_url,
+                                hints_used=hints_used,
+                                score=result["total_score"],
+                                total_tests=result["total_tests"],
+                                passed_tests=result["passed"],
+                                all_passed=result["all_passed"],
+                                chat_history=hint_log or [],
+                            )
+                            print(f"✅ Logged to Google Sheets: {student_name}")
+                        except Exception as e:
+                            print(f"⚠️ Google Sheets logging failed: {e}")
+                    
+                    # Git Submissions (detailed backup with all code)
+                    if GIT_SUBMISSIONS_AVAILABLE:
+                        try:
+                            print("🔄 Pushing to Git repository...")
+                            push_submission_to_git(
+                                student_name=student_name,
+                                repo_url=cs.github_url,
+                                original_code=cs.original_code,
+                                buggy_code=cs.sabotaged_code,
+                                student_code=submitted_code,
+                                chat_history=hint_log or [],
+                                score=result["total_score"],
+                                total_tests=result["total_tests"],
+                                passed_tests=result["passed"],
+                                hints_used=hints_used,
+                                challenge_prompt=cs.readme(),
+                                target_file=cs.target_file,
+                            )
+                            print(f"✅ Pushed to Git: {student_name}")
+                        except Exception as e:
+                            print(f"⚠️ Git submission backup failed: {e}")
                 
+                # Start background upload (won't block UI)
+                upload_thread = threading.Thread(target=_background_upload, daemon=True)
+                upload_thread.start()
+                """
             except Exception as exc:
                 import traceback
                 error_details = traceback.format_exc()
                 debug_logs = log_capture.getvalue() + f"\n\n❌ ERROR:\n{error_details}"
                 sys.stdout = original_stdout  # Restore stdout
                 err = f"<p style='color:#ef4444;padding:20px;font-family:monospace;'>❌ Error during evaluation:<br>{exc}</p>"
-                yield (
-                    gr.update(),  # challenge_page
-                    gr.update(),  # results_page
-                    err, "", "", "",
-                    submit_count,
-                    debug_logs,
-                    debug_logs
-                )
+                yield (gr.update(visible=False), gr.update(visible=True), err, "", "", "", submit_count, debug_logs, debug_logs)
             finally:
                 sys.stdout = original_stdout  # Always restore stdout
 
