@@ -1309,6 +1309,17 @@ def create_full_interface() -> gr.Blocks:
                             
                             # Testing: Start with just score_summary_html from Results
                             test_score_html = gr.HTML("", label="Test Score")
+                            
+                            # Test 2: Add inner Tabs (like in Results)
+                            with gr.Tabs():
+                                with gr.Tab("🧪 Test Tab 1"):
+                                    test_tab1_html = gr.HTML("")
+                                
+                                with gr.Tab("🔍 Test Tab 2"):
+                                    test_tab2_html = gr.HTML("")
+                                
+                                with gr.Tab("💡 Test Tab 3"):
+                                    test_tab3_html = gr.HTML("")
 
                 # ── Right column: AI assistant + submit ───────────────────
                 with gr.Column(scale=2, elem_classes=["right-col"]):
@@ -1404,10 +1415,17 @@ def create_full_interface() -> gr.Blocks:
             </div>
             """
             
+            tab1_html = "<p style='padding: 20px; color: green;'>✅ Tab 1 content</p>"
+            tab2_html = "<p style='padding: 20px; color: blue;'>✅ Tab 2 content</p>"
+            tab3_html = "<p style='padding: 20px; color: orange;'>✅ Tab 3 content</p>"
+            
             return (
                 gr.update(selected=5),  # Switch to Test Page tab
-                "# 🧪 הכפתור עובד!\n\nעכשיו בודקים את חלק ה-HTML של התוצאות...",  # Update challenge readme
+                "# 🧪 Test 2: Inner Tabs\n\nבודקים אם gr.Tabs פנימי עובד...",  # Update challenge readme
                 test_html,  # Test score HTML
+                tab1_html,  # Tab 1
+                tab2_html,  # Tab 2
+                tab3_html,  # Tab 3
             )
 
         # ── Setup callback ─────────────────────────────────────────────────
@@ -1789,7 +1807,7 @@ def create_full_interface() -> gr.Blocks:
         test_results_btn.click(
             test_results_navigation,
             inputs=[],
-            outputs=[left_tabs, challenge_readme, test_score_html],
+            outputs=[left_tabs, challenge_readme, test_score_html, test_tab1_html, test_tab2_html, test_tab3_html],
         )
         
         send_btn.click(
