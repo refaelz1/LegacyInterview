@@ -1389,8 +1389,13 @@ def create_full_interface() -> gr.Blocks:
             )
         
         def test_results_navigation():
-            """Test function to switch to simple Test Page tab."""
-            return gr.update(selected=5)  # Switch to Test Page tab (id=5)
+            """Test function to verify button works by updating visible content."""
+            logger.info("🧪 Test button clicked - updating UI")
+            print("🧪 Test button clicked!")
+            return (
+                gr.update(selected=5),  # Try to switch tab
+                "# 🧪 הכפתור עובד!\n\nאם אתה רואה את זה, הכפתור עובד!"  # Update challenge readme
+            )
 
         # ── Setup callback ─────────────────────────────────────────────────
 
@@ -1770,7 +1775,8 @@ def create_full_interface() -> gr.Blocks:
         # Test button to navigate to simple Test Page tab
         test_results_btn.click(
             test_results_navigation,
-            outputs=left_tabs,
+            inputs=[],
+            outputs=[left_tabs, challenge_readme],
         )
         
         send_btn.click(
