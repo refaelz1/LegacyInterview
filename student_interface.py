@@ -1283,15 +1283,15 @@ def create_full_interface() -> gr.Blocks:
                         with gr.Tab("📊 Results", id=4):
                             score_summary_html = gr.HTML("")
 
-                            with gr.Tabs():
-                                with gr.Tab("🧪 Test Results"):
-                                    results_test_html = gr.HTML("")
+                            # Use Accordions instead of Tabs (more stable for dynamic updates)
+                            with gr.Accordion("🧪 Test Results", open=True):
+                                results_test_html = gr.HTML("")
 
-                                with gr.Tab("🔍 Changes & Expected"):
-                                    results_changes_html = gr.HTML("")
+                            with gr.Accordion("🔍 Changes & Expected", open=False):
+                                results_changes_html = gr.HTML("")
 
-                                with gr.Tab("💡 Hints Used"):
-                                    results_hints_html = gr.HTML("")
+                            with gr.Accordion("💡 Hints Used", open=False):
+                                results_hints_html = gr.HTML("")
                             
                             # Debug console (collapsible)
                             with gr.Accordion("🐛 Debug Console", open=False):
@@ -1305,21 +1305,7 @@ def create_full_interface() -> gr.Blocks:
                         
                         # ── Simple Test Tab (for debugging navigation) ────────
                         with gr.Tab("🧪 Test Page", id=5):
-                            test_page_content = gr.Markdown("# ✅ זה עובד!\n\nזה עמוד פשוט לבדיקה, ללא שום לוגיקה.")
-                            
-                            # Testing: Start with just score_summary_html from Results
-                            test_score_html = gr.HTML("", label="Test Score")
-                            
-                            # Test 2: Add inner Tabs (like in Results)
-                            with gr.Tabs():
-                                with gr.Tab("🧪 Test Tab 1"):
-                                    test_tab1_html = gr.HTML("")
-                                
-                                with gr.Tab("🔍 Test Tab 2"):
-                                    test_tab2_html = gr.HTML("")
-                                
-                                with gr.Tab("💡 Test Tab 3"):
-                                    test_tab3_html = gr.HTML("")
+                            gr.Markdown("# 🧪 Test Page\n\nThis tab was used for debugging. Results now use Accordions instead of nested Tabs!")
 
                 # ── Right column: AI assistant + submit ───────────────────
                 with gr.Column(scale=2, elem_classes=["right-col"]):
@@ -1403,30 +1389,9 @@ def create_full_interface() -> gr.Blocks:
             )
         
         def test_results_navigation():
-            """Test function to verify button works by updating visible content."""
-            logger.info("🧪 Test button clicked - updating UI")
-            print("🧪 Test button clicked!")
-            
-            # Create a simple HTML score summary (like in Results)
-            test_html = """
-            <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 15px; text-align: center; color: white; margin: 20px 0;'>
-                <h2 style='margin: 0; font-size: 2.5em;'>🧪 TEST SCORE</h2>
-                <p style='font-size: 1.2em; margin: 10px 0;'>This is a test HTML component</p>
-            </div>
-            """
-            
-            tab1_html = "<p style='padding: 20px; color: green;'>✅ Tab 1 content</p>"
-            tab2_html = "<p style='padding: 20px; color: blue;'>✅ Tab 2 content</p>"
-            tab3_html = "<p style='padding: 20px; color: orange;'>✅ Tab 3 content</p>"
-            
-            return (
-                gr.update(selected=5),  # Switch to Test Page tab
-                "# 🧪 Test 2: Inner Tabs\n\nבודקים אם gr.Tabs פנימי עובד...",  # Update challenge readme
-                test_html,  # Test score HTML
-                tab1_html,  # Tab 1
-                tab2_html,  # Tab 2
-                tab3_html,  # Tab 3
-            )
+            """Test function - no longer needed but keeping for debugging."""
+            logger.info("🧪 Test button clicked")
+            return gr.update(selected=5)  # Switch to Test Page tab
 
         # ── Setup callback ─────────────────────────────────────────────────
 
@@ -1807,7 +1772,7 @@ def create_full_interface() -> gr.Blocks:
         test_results_btn.click(
             test_results_navigation,
             inputs=[],
-            outputs=[left_tabs, challenge_readme, test_score_html, test_tab1_html, test_tab2_html, test_tab3_html],
+            outputs=[left_tabs],
         )
         
         send_btn.click(
